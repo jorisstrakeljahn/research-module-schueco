@@ -1,0 +1,66 @@
+[project]
+name = "trendscout-backend"
+version = "0.1.0"
+description = "AI-assisted trend scouting platform (Schüco research module) - backend"
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "sqlmodel>=0.0.22",
+    "psycopg[binary]>=3.2",
+    "pgvector>=0.3.6",
+    "httpx>=0.27",
+    "pydantic-settings>=2.5",
+    "numpy>=1.26",
+    "scikit-learn>=1.4",
+    "typer>=0.12",
+]
+
+[project.optional-dependencies]
+# Scientific / production components (heavier installs). Default impls when present.
+ml = [
+    "sentence-transformers>=3.0",
+    "bertopic>=0.16",
+    "umap-learn>=0.5.6",
+    "hdbscan>=0.8.38",
+]
+# LLM provider client for trend descriptions / classification.
+llm = [
+    "openai>=1.50",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "respx>=0.21",
+    "ruff>=0.7",
+]
+
+[project.scripts]
+trendscout = "app.cli:app"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["app*"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI dependency-injection idiom uses callables as argument defaults.
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+pythonpath = ["."]
