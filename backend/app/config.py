@@ -24,7 +24,11 @@ class Settings(BaseSettings):
     # Pipeline component selection (see .env.example for options)
     embedder: str = "hashing"
     topic_model: str = "simple"
+    topic_max: int = 12  # upper bound on number of topics/clusters per run
     describer: str = "template"
+    classifier: str = "heuristic"  # PESTEL/impact assessment: heuristic | openai
+    translator: str = "auto"  # on-demand DE/EN translation: auto | openai | none
+    language: str = "en"  # language of LLM-generated trend text: en | de
     embedding_dim: int = 384
 
     # Data sources: comma-separated list of connector names (openalex, arxiv, firecrawl)

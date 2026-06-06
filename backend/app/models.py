@@ -41,6 +41,23 @@ SOURCE_TYPES = (
 MATURITY_LEVELS = ("weak_signal", "emerging", "established", "megatrend")
 RADAR_STAGES = ("act", "prepare", "watch")
 
+# The six classic PESTEL macro-environment dimensions (Theobald 2016; Keicher 2022),
+# used as the classification label set (ADR-25). Schüco's Trendradar renders these as
+# domain sectors (see PESTEL_SECTOR_LABELS); the canonical keys stay PESTEL for
+# theoretical traceability.
+PESTEL_DIMENSIONS = (
+    "political",
+    "economic",
+    "social",
+    "technological",
+    "environmental",
+    "legal",
+)
+
+# Schüco's parallel thematic colour taxonomy on the Trendradar (ADR-27): an overlay
+# orthogonal to the PESTEL sectors.
+TREND_CATEGORIES = ("climate", "technology", "digital", "markets")
+
 
 class Source(SQLModel, table=True):
     __tablename__ = "source"
@@ -117,6 +134,16 @@ class Topic(SQLModel, table=True):
     label: str
     keywords: list[str] | None = Field(default=None, sa_column=Column(JSONB))
     size: int = 0
+    # Dominant region/country of the topic's documents, aggregated at run time so the
+    # Trendradar can be filtered by region (project plan §7.3). Null when the sources
+    # carry no geographic metadata.
+    region: str | None = Field(default=None, index=True)
+    country: str | None = Field(default=None, index=True)
+    # Centroid embedding of the topic's documents; persisted so emergence (semantic
+    # novelty) can be measured against the previous run's topics (ADR-19).
+    centroid: list[float] | None = Field(
+        default=None, sa_column=Column(Vector(EMBEDDING_DIM))
+    )
 
     run: Run | None = Relationship(back_populates="topics")
     trend: "Trend" = Relationship(back_populates="topic")
@@ -143,6 +170,9 @@ class Trend(SQLModel, table=True):
     title: str
     summary: str = ""
     maturity: str | None = None  # one of MATURITY_LEVELS
+    # Semantic novelty in [0, 1] vs. the previous run (None on the first run); the
+    # emergence axis of the topic matrix (ADR-19).
+    emergence: float | None = None
     evidence: list[dict] | None = Field(default=None, sa_column=Column(JSONB))
 
     topic: Topic | None = Relationship(back_populates="trend")
@@ -156,12 +186,34 @@ class TrendAssessment(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     trend_id: int = Field(foreign_key="trend.id", index=True, unique=True)
     pestel: list[str] | None = Field(default=None, sa_column=Column(JSONB))
-    impact: float | None = None
-    uncertainty: float | None = None
+    category: str | None = None  # one of TREND_CATEGORIES (radar colour, ADR-27)
+    impact: float | None = None  # 1-10 (ADR-26)
+    urgency: float | None = None  # 1-10, "Dringlichkeit"; with impact -> radar ring
+    uncertainty: float | None = None  # 1-10, for the separate impact/uncertainty grid
     radar_stage: str | None = None  # one of RADAR_STAGES
     rationale: str | None = None
 
     trend: Trend | None = Relationship(back_populates="assessment")
+
+
+class ReferenceTrend(SQLModel, table=True):
+    """A manually-identified trend from the practice partner's existing process.
+
+    Stored as the evaluation baseline: the overlap between the system's discovered
+    trends and this curated list yields the precision/recall-style "strategische
+    Relevanz" metric of the project plan (§11). Independent of any Run.
+    """
+
+    __tablename__ = "reference_trend"
+
+    id: int | None = Field(default=None, primary_key=True)
+    title: str
+    keywords: list[str] | None = Field(default=None, sa_column=Column(JSONB))
+    pestel: list[str] | None = Field(default=None, sa_column=Column(JSONB))
+    category: str | None = None
+    source: str = "schueco_manual"  # provenance of the reference entry
+    note: str | None = None
+    created_at: datetime = Field(default_factory=_utcnow)
 
 
 class ExpertFeedback(SQLModel, table=True):

@@ -22,13 +22,31 @@ def get_engine():
     return _engine
 
 
+# Lightweight, idempotent column additions for tables that predate a model change.
+# The project intentionally uses create_all instead of a migration tool (ADR-16);
+# create_all does not ALTER existing tables, so additive columns are applied here.
+_ADDITIVE_COLUMNS: tuple[tuple[str, str, str], ...] = (
+    ("topic", "region", "VARCHAR"),
+    ("topic", "country", "VARCHAR"),
+)
+
+
 def init_db() -> None:
-    """Enable the pgvector extension and create all tables."""
+    """Enable the pgvector extension, create all tables, apply additive columns."""
     engine = get_engine()
     with engine.connect() as conn:
         conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         conn.commit()
     SQLModel.metadata.create_all(engine)
+    with engine.connect() as conn:
+        for table, column, coltype in _ADDITIVE_COLUMNS:
+            conn.execute(
+                text(
+                    f'ALTER TABLE "{table}" ADD COLUMN IF NOT EXISTS '
+                    f'"{column}" {coltype}'
+                )
+            )
+        conn.commit()
 
 
 def get_session() -> Iterator[Session]:
