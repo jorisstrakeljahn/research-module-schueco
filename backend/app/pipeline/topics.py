@@ -67,14 +67,23 @@ def _ctfidf_keywords(
 class SimpleTopicModeler:
     """Offline topic modeler: K-Means over embeddings + c-TF-IDF labels."""
 
-    def __init__(self, n_topics: int | None = None, random_state: int = 42) -> None:
+    def __init__(
+        self,
+        n_topics: int | None = None,
+        max_topics: int = 12,
+        random_state: int = 42,
+    ) -> None:
         self.n_topics = n_topics
+        self.max_topics = max(1, max_topics)
         self.random_state = random_state
 
     def _choose_k(self, n_docs: int) -> int:
+        # An exact count overrides; otherwise target ~10 docs per topic so that larger
+        # corpora yield more (and finer) clusters - the granularity needed for niche
+        # weak signals and a dominant megatrend cluster - capped at ``max_topics``.
         if self.n_topics:
             return max(1, min(self.n_topics, n_docs))
-        return max(1, min(8, n_docs // 3 or 1))
+        return max(1, min(self.max_topics, n_docs // 10 or 1))
 
     def fit(self, texts: list[str], embeddings: np.ndarray) -> TopicResult:
         n = len(texts)
@@ -134,11 +143,13 @@ class BERTopicModeler:
         return TopicResult(labels=[int(x) for x in labels], topics=topics)
 
 
-def get_topic_modeler(name: str, n_topics: int | None = None) -> TopicModeler:
+def get_topic_modeler(
+    name: str, n_topics: int | None = None, max_topics: int = 12
+) -> TopicModeler:
     """Factory: resolve a topic modeler by name."""
     name = name.lower()
     if name == "simple":
-        return SimpleTopicModeler(n_topics=n_topics)
+        return SimpleTopicModeler(n_topics=n_topics, max_topics=max_topics)
     if name == "bertopic":
         return BERTopicModeler(n_topics=n_topics)
     raise ValueError(f"Unknown topic model: {name!r}")
