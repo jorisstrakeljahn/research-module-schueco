@@ -7,14 +7,29 @@ Abstracts are delivered as an inverted index and reconstructed here.
 
 from __future__ import annotations
 
+from collections import Counter
 from datetime import UTC, datetime
 
 import httpx
 
 from app.config import get_settings
 from app.ingestion.base import RawDocument
+from app.ingestion.geo import region_for_country
 
 OPENALEX_WORKS_URL = "https://api.openalex.org/works"
+
+
+def _dominant_country(work: dict) -> str | None:
+    """Most frequent institution country code across a work's authorships (ISO-2)."""
+    codes: list[str] = []
+    for authorship in work.get("authorships") or []:
+        for institution in authorship.get("institutions") or []:
+            code = institution.get("country_code")
+            if code:
+                codes.append(code.upper())
+    if not codes:
+        return None
+    return Counter(codes).most_common(1)[0][0]
 
 
 def reconstruct_abstract(inverted_index: dict[str, list[int]] | None) -> str:
@@ -43,6 +58,7 @@ def work_to_document(work: dict) -> RawDocument:
     title = work.get("title") or work.get("display_name") or "(untitled)"
     abstract = reconstruct_abstract(work.get("abstract_inverted_index"))
     text = f"{title}. {abstract}".strip()
+    country = _dominant_country(work)
     return RawDocument(
         external_id=work.get("id"),
         title=title,
@@ -50,6 +66,8 @@ def work_to_document(work: dict) -> RawDocument:
         url=work.get("id"),
         published_at=_parse_date(work.get("publication_date")),
         language=work.get("language"),
+        country=country,
+        region=region_for_country(country),
         source_name="OpenAlex",
         source_type="science",
     )
