@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
+import numpy as np
 from sqlmodel import Session, select
 
 from app.config import Settings, get_settings
@@ -23,10 +24,41 @@ from app.models import (
     Trend,
     TrendAssessment,
 )
+from app.pipeline.classify import TrendSignal, get_classifier, radar_stage
 from app.pipeline.describe import get_describer
 from app.pipeline.embeddings import get_embedder
+from app.pipeline.emergence import compute_emergence
+from app.pipeline.retrieval import PgVectorRetriever, topic_centroid
 from app.pipeline.timeseries import build_topic_timepoints, classify_maturity
 from app.pipeline.topics import get_topic_modeler
+
+
+def _previous_topic_centroids(session: Session, current_run_id: int) -> list[np.ndarray]:
+    """Topic centroids of the most recent completed run before ``current_run_id``.
+
+    These form the semantic baseline against which the current run's topics are scored
+    for emergence (novelty). Empty when this is the first run.
+    """
+    prev_run = session.exec(
+        select(Run)
+        .where(Run.status == "completed", Run.id < current_run_id)
+        .order_by(Run.id.desc())
+    ).first()
+    if not prev_run:
+        return []
+    topics = session.exec(select(Topic).where(Topic.run_id == prev_run.id)).all()
+    return [np.asarray(t.centroid) for t in topics if t.centroid is not None]
+
+
+def _dominant_geo(docs: list[Document]) -> tuple[str | None, str | None]:
+    """Most common (region, country) among a topic's documents; None when absent."""
+    from collections import Counter
+
+    regions = Counter(d.region for d in docs if d.region)
+    countries = Counter(d.country for d in docs if d.country)
+    region = regions.most_common(1)[0][0] if regions else None
+    country = countries.most_common(1)[0][0] if countries else None
+    return region, country
 
 
 def _get_or_create_source(session: Session, name: str, source_type: str) -> Source:
@@ -86,6 +118,7 @@ def run_pipeline(
     raw_docs: list[RawDocument] | None = None,
     settings: Settings | None = None,
     run_params: dict | None = None,
+    language: str | None = None,
 ) -> Run:
     """Execute one full pipeline run and persist all artifacts. Returns the Run.
 
@@ -93,6 +126,7 @@ def run_pipeline(
     provided, from a single ``connector`` fetch for ``query`` (the simple path).
     """
     settings = settings or get_settings()
+    language = language or settings.language
 
     params = {"query": query, "limit": limit}
     if run_params:
@@ -136,7 +170,7 @@ def run_pipeline(
         session.commit()
 
         # 3. Topic modeling
-        modeler = get_topic_modeler(settings.topic_model)
+        modeler = get_topic_modeler(settings.topic_model, max_topics=settings.topic_max)
         result = modeler.fit(texts, embeddings)
 
         # 4. Time series per topic
@@ -144,19 +178,44 @@ def run_pipeline(
             [d.published_at for d in docs], result.labels
         )
 
-        # 5. Topics + trends + descriptions
+        # 4b. Topic centroids -> emergence vs. the previous run (ADR-19)
+        centroids = {
+            info.topic_index: topic_centroid(
+                embeddings, result.labels, info.topic_index
+            )
+            for info in result.topics
+            if info.topic_index >= 0
+        }
+        emergence = compute_emergence(
+            centroids, _previous_topic_centroids(session, run.id)
+        )
+
+        # 5. Topics + trends + descriptions (RAG retrieval over pgvector, ADR-11/14)
         describer = get_describer(settings.describer)
+        classifier = get_classifier(settings.classifier)
+        retriever = PgVectorRetriever(session, [d.id for d in docs])
         n_topics = 0
         for info in result.topics:
             if info.topic_index < 0:  # outliers are not trends
                 continue
             n_topics += 1
+            centroid = centroids[info.topic_index]
+            region, country = _dominant_geo(
+                [
+                    d
+                    for d, label in zip(docs, result.labels, strict=True)
+                    if label == info.topic_index
+                ]
+            )
             topic = Topic(
                 run_id=run.id,
                 topic_index=info.topic_index,
                 label=info.label,
                 keywords=info.keywords,
                 size=info.size,
+                region=region,
+                country=country,
+                centroid=centroid.tolist() if centroid.size else None,
             )
             session.add(topic)
             session.commit()
@@ -168,13 +227,25 @@ def run_pipeline(
                     TopicTimepoint(topic_id=topic.id, period=period, doc_count=count)
                 )
 
-            representative = [
-                {"title": d.title, "url": d.url, "text": d.text}
-                for d, label in zip(docs, result.labels, strict=True)
-                if label == info.topic_index
-            ][:6]
-            description = describer.describe(info.keywords, representative)
-            maturity = classify_maturity(tp)
+            # Retrieve grounding evidence by vector similarity to the topic centroid;
+            # fall back to the in-cluster documents if retrieval yields nothing.
+            representative: list[dict] = []
+            if centroid.size:
+                try:
+                    representative = retriever.retrieve(centroid, k=6)
+                except Exception:
+                    representative = []
+            if not representative:
+                representative = [
+                    {"title": d.title, "url": d.url, "text": d.text}
+                    for d, label in zip(docs, result.labels, strict=True)
+                    if label == info.topic_index
+                ][:6]
+            description = describer.describe(
+                info.keywords, representative, language=language
+            )
+            topic_emergence = emergence.get(info.topic_index)
+            maturity = classify_maturity(tp, emergence=topic_emergence)
 
             trend = Trend(
                 topic_id=topic.id,
@@ -182,12 +253,49 @@ def run_pipeline(
                 title=description.title,
                 summary=description.summary,
                 maturity=maturity,
+                emergence=topic_emergence,
                 evidence=description.evidence,
             )
             session.add(trend)
             session.commit()
             session.refresh(trend)
-            session.add(TrendAssessment(trend_id=trend.id, radar_stage="watch"))
+
+            # 6/7. PESTEL + category classification and impact/urgency scoring, from
+            # which the Act/Prepare/Watch radar stage is derived (ADR-25/26/27).
+            n_sources = len(
+                {
+                    d.source_id
+                    for d, label in zip(docs, result.labels, strict=True)
+                    if label == info.topic_index
+                }
+            )
+            classification = classifier.classify(
+                TrendSignal(
+                    keywords=info.keywords or [],
+                    title=description.title,
+                    summary=description.summary,
+                    maturity=maturity,
+                    emergence=topic_emergence,
+                    size=info.size,
+                    n_sources=max(1, n_sources),
+                    timepoints=tp,
+                    evidence=description.evidence,
+                )
+            )
+            session.add(
+                TrendAssessment(
+                    trend_id=trend.id,
+                    pestel=classification.pestel,
+                    category=classification.category,
+                    impact=classification.impact,
+                    urgency=classification.urgency,
+                    uncertainty=classification.uncertainty,
+                    radar_stage=radar_stage(
+                        classification.impact, classification.urgency
+                    ),
+                    rationale=classification.rationale,
+                )
+            )
 
         session.commit()
 
