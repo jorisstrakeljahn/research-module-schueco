@@ -39,6 +39,26 @@ def test_work_to_document_maps_fields():
     assert doc.source_type == "science"
 
 
+def test_work_to_document_extracts_region_from_authorships():
+    work = {
+        "id": "https://openalex.org/W9",
+        "title": "Facade research in China",
+        "authorships": [
+            {"institutions": [{"country_code": "CN"}]},
+            {"institutions": [{"country_code": "CN"}, {"country_code": "DE"}]},
+        ],
+    }
+    doc = work_to_document(work)
+    assert doc.country == "CN"
+    assert doc.region == "Asia"
+
+
+def test_work_to_document_region_none_without_country():
+    doc = work_to_document({"id": "x", "title": "No affiliation"})
+    assert doc.country is None
+    assert doc.region is None
+
+
 @respx.mock
 def test_fetch_calls_api_and_parses():
     payload = {

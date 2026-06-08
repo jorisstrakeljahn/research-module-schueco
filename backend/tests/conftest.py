@@ -16,6 +16,7 @@ import os
 os.environ["EMBEDDER"] = "hashing"
 os.environ["TOPIC_MODEL"] = "simple"
 os.environ["DESCRIBER"] = "template"
+os.environ["TRANSLATOR"] = "none"
 os.environ["EMBEDDING_DIM"] = "384"
 os.environ["SOURCES"] = "openalex"
 os.environ["EXPANDER"] = "none"

@@ -93,6 +93,16 @@ def test_classify_maturity_levels():
     assert classify_maturity(big) == "megatrend"
 
 
+def test_classify_maturity_emergence_axis():
+    # A stable, voluminous-but-flat topic reads as "established"...
+    stable = {"2022-Q1": 5, "2022-Q2": 5, "2023-Q1": 5, "2023-Q2": 5}
+    assert classify_maturity(stable) == "established"
+    # ...but if it is semantically novel vs. the previous run, it is "emerging".
+    assert classify_maturity(stable, emergence=0.8) == "emerging"
+    # Low novelty leaves the base level untouched.
+    assert classify_maturity(stable, emergence=0.1) == "established"
+
+
 def test_template_describer_is_grounded():
     rep = [
         {"title": "Adaptive facade systems", "url": "http://x/1", "text": "..."},

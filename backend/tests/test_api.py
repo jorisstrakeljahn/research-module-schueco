@@ -86,6 +86,54 @@ def test_maturity_filter(client, session):
 
 
 @requires_db
+def test_start_run(client, monkeypatch):
+    calls: list[tuple] = []
+    monkeypatch.setattr(
+        "app.api.routes._run_pipeline_bg",
+        lambda keywords, query, limit, language="en", mode="deep_research": calls.append(
+            (keywords, query, limit, language, mode)
+        ),
+    )
+
+    ok = client.post(
+        "/runs", json={"keywords": ["adaptive facade", "bipv"], "language": "de"}
+    )
+    assert ok.status_code == 202
+    assert ok.json()["query"] == "adaptive facade bipv"
+    assert ok.json()["language"] == "de"
+    assert ok.json()["mode"] == "deep_research"
+    assert calls and calls[0][0] == ["adaptive facade", "bipv"]
+    assert calls[0][4] == "deep_research"
+
+    simple = client.post(
+        "/runs", json={"keywords": ["facade"], "mode": "simple"}
+    )
+    assert simple.status_code == 202
+    assert simple.json()["mode"] == "simple"
+
+    bad = client.post("/runs", json={"keywords": []})
+    assert bad.status_code == 422
+
+
+@requires_db
+def test_translate_trend(client, session):
+    trend = _seed(session)
+    # Offline tests have no API key -> NoopTranslator -> identity output.
+    resp = client.post(f"/trends/{trend.id}/translate", json={"language": "de"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["language"] == "de"
+    assert body["title"] == "Adaptive facades"
+
+    assert client.post(
+        f"/trends/{trend.id}/translate", json={"language": "fr"}
+    ).status_code == 422
+    assert client.post(
+        "/trends/999999/translate", json={"language": "de"}
+    ).status_code == 404
+
+
+@requires_db
 def test_feedback(client, session):
     trend = _seed(session)
     resp = client.post(

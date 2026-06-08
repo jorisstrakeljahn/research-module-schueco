@@ -7,7 +7,16 @@ from datetime import UTC, datetime
 from sqlmodel import select
 
 from app.ingestion.base import RawDocument
-from app.models import Chunk, Topic, TopicTimepoint, Trend
+from app.models import (
+    PESTEL_DIMENSIONS,
+    RADAR_STAGES,
+    TREND_CATEGORIES,
+    Chunk,
+    Topic,
+    TopicTimepoint,
+    Trend,
+    TrendAssessment,
+)
 from app.pipeline.run import run_pipeline
 from tests.conftest import requires_db
 
@@ -71,6 +80,10 @@ def test_run_pipeline_end_to_end(session):
     assert len(trends) == run.n_topics
     assert all(t.title and t.summary for t in trends)
     assert all(t.maturity for t in trends)
+    # Topic centroids are persisted for cross-run emergence; emergence itself is
+    # undefined on the first run (no baseline).
+    assert all(t.centroid is not None and len(t.centroid) == 384 for t in topics)
+    assert all(t.emergence is None for t in trends)
 
     # chunks have embeddings of the configured dimension
     chunks = session.exec(select(Chunk)).all()
@@ -80,3 +93,31 @@ def test_run_pipeline_end_to_end(session):
     # at least one topic has a time series
     timepoints = session.exec(select(TopicTimepoint)).all()
     assert len(timepoints) >= 1
+
+    # every trend gets a PESTEL/category/impact assessment with a valid radar stage
+    assessments = session.exec(select(TrendAssessment)).all()
+    assert len(assessments) == run.n_topics
+    for a in assessments:
+        assert a.pestel and all(p in PESTEL_DIMENSIONS for p in a.pestel)
+        assert a.category in TREND_CATEGORIES
+        assert 1.0 <= a.impact <= 10.0 and 1.0 <= a.urgency <= 10.0
+        assert a.radar_stage in RADAR_STAGES
+
+
+@requires_db
+def test_emergence_is_scored_against_previous_run(session):
+    docs = _make_docs()
+    first = run_pipeline(
+        "buildings", session=session, limit=50, connector=FakeConnector(docs)
+    )
+    second = run_pipeline(
+        "buildings", session=session, limit=50, connector=FakeConnector(docs)
+    )
+
+    assert first.status == "completed" and second.status == "completed"
+    trends = session.exec(select(Trend).where(Trend.run_id == second.id)).all()
+    # The second run has the first as a baseline, so emergence is now defined and, for
+    # an identical corpus, low (the topics are continuations).
+    assert trends
+    assert all(t.emergence is not None for t in trends)
+    assert all(t.emergence < 0.2 for t in trends)
