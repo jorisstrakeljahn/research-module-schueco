@@ -7,7 +7,6 @@ from sqlmodel import Session
 
 from app.config import get_settings
 from app.db import get_engine, init_db
-from app.pipeline.run import run_pipeline
 
 app = typer.Typer(help="Trendscout backend CLI")
 
@@ -23,11 +22,18 @@ def init_db_command() -> None:
 def run_command(
     query: str = typer.Argument(..., help="Search query for the domain, e.g. 'facade'"),
     limit: int = typer.Option(50, help="Max documents to fetch"),
+    language: str = typer.Option(None, help="Output language: en | de (overrides .env)"),
 ) -> None:
-    """Run one full pipeline (ingest -> embed -> topics -> describe -> persist)."""
+    """Run one full pipeline (ingest -> embed -> topics -> describe -> persist).
+
+    Fetches ``query`` once from every enabled source (SOURCES) - the simple,
+    non-iterative counterpart to ``research``.
+    """
+    from app.research.service import run_simple_search
+
     init_db()
     with Session(get_engine()) as session:
-        run = run_pipeline(query, session=session, limit=limit)
+        run = run_simple_search(query, session=session, limit=limit, language=language)
     typer.echo(
         f"Run {run.id} {run.status}: {run.n_documents} documents, {run.n_topics} topics."
     )
@@ -41,70 +47,37 @@ def research_command(
     rounds: int = typer.Option(None, help="Override RESEARCH_MAX_ROUNDS"),
     max_docs: int = typer.Option(None, help="Override RESEARCH_MAX_DOCS"),
     per_query: int = typer.Option(None, help="Override RESEARCH_PER_QUERY_LIMIT"),
+    language: str = typer.Option(None, help="Output language: en | de (overrides .env)"),
     use_feedback: bool = typer.Option(
         True, help="Seed/steer the crawl from prior expert feedback"
     ),
 ) -> None:
-    """Run a bounded deep-research crawl across all sources, then the full pipeline."""
-    from app.ingestion.registry import build_connectors
-    from app.research.crawler import DeepResearchCrawler
-    from app.research.expand import get_expander
-    from app.research.feedback import (
-        negative_terms_from_feedback,
-        seeds_from_feedback,
-    )
-    from app.research.relevance import get_relevance
-    from app.research.seeds import load_seeds, merge_seeds
+    """Run a bounded deep-research crawl across all sources, then the full pipeline.
+
+    This is also the command to schedule for the weekly monitoring run (project plan
+    §6.3), e.g. via cron: ``0 6 * * 1 cd /path/to/backend && uv run trendscout research``.
+    """
+    from app.research.service import run_deep_research
 
     settings = get_settings()
     init_db()
-    connectors = build_connectors(settings.source_list, settings)
-    expander = get_expander(settings.expander)
 
     with Session(get_engine()) as session:
-        base_seeds = [query] if query else load_seeds(settings)
-        fb_seeds = seeds_from_feedback(session) if use_feedback else []
-        excludes = negative_terms_from_feedback(session) if use_feedback else []
-        seeds = merge_seeds(base_seeds, fb_seeds)
-
-        relevance = get_relevance(
-            settings.relevance,
-            domain=settings.research_domain,
-            include_terms=seeds,
-            exclude_terms=excludes,
-        )
-        crawler = DeepResearchCrawler(
-            connectors,
-            expander=expander,
-            relevance=relevance,
-            domain=settings.research_domain,
-            max_rounds=rounds or settings.research_max_rounds,
-            max_docs=max_docs or settings.research_max_docs,
-            per_query_limit=per_query or settings.research_per_query_limit,
-            expand_terms=settings.research_expand_terms,
-        )
-        typer.echo(
-            f"Crawling {len(seeds)} seed(s) across "
-            f"{len(connectors)} source(s): {settings.sources}"
-        )
-        result = crawler.crawl(seeds)
-        typer.echo(
-            f"Crawl: {len(result.documents)} docs in {result.rounds} round(s), "
-            f"{len(result.queries_used)} queries."
-        )
-        run = run_pipeline(
-            settings.research_domain,
+        outcome = run_deep_research(
             session=session,
-            raw_docs=result.documents,
+            seeds=[query] if query else None,
             settings=settings,
-            run_params={
-                "mode": "deep_research",
-                "sources": settings.source_list,
-                "rounds": result.rounds,
-                "queries_used": result.queries_used,
-                "seeds": seeds,
-            },
+            language=language,
+            use_feedback=use_feedback,
+            max_rounds=rounds,
+            max_docs=max_docs,
+            per_query_limit=per_query,
         )
+    run = outcome.run
+    typer.echo(
+        f"Crawl: {run.n_documents} docs in {outcome.rounds} round(s), "
+        f"{len(outcome.queries_used)} queries across {settings.sources}."
+    )
     typer.echo(
         f"Run {run.id} {run.status}: {run.n_documents} documents, {run.n_topics} topics."
     )
