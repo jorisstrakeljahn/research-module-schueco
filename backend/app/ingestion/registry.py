@@ -39,13 +39,18 @@ def build_connectors(
             connectors.append(OpenAlexConnector())
         elif key == "arxiv":
             connectors.append(ArxivConnector())
-        elif key == "firecrawl":
+        elif key in ("firecrawl", "firecrawl_web"):
+            # firecrawl       -> news/market signals (source_type "news")
+            # firecrawl_web   -> faster, noisier web pages as weak signals ("web")
             if settings.firecrawl_api_key:
+                source_type = "web" if key == "firecrawl_web" else "news"
                 connectors.append(
-                    FirecrawlConnector(api_key=settings.firecrawl_api_key)
+                    FirecrawlConnector(
+                        api_key=settings.firecrawl_api_key, source_type=source_type
+                    )
                 )
             else:
-                logger.warning("Skipping 'firecrawl' source: FIRECRAWL_API_KEY not set.")
+                logger.warning("Skipping %r source: FIRECRAWL_API_KEY not set.", key)
         else:
             raise ValueError(f"Unknown source connector: {name!r}")
 
