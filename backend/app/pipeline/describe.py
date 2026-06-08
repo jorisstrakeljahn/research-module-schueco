@@ -20,9 +20,12 @@ class TrendDescription:
     evidence: list[dict]
 
 
+_LANGUAGE_NAMES = {"de": "German", "en": "English"}
+
+
 class Describer(Protocol):
     def describe(
-        self, keywords: list[str], representative: list[dict]
+        self, keywords: list[str], representative: list[dict], language: str = "en"
     ) -> TrendDescription:
         ...
 
@@ -39,7 +42,7 @@ class TemplateDescriber:
     """Deterministic, offline description grounded in the representative sources."""
 
     def describe(
-        self, keywords: list[str], representative: list[dict]
+        self, keywords: list[str], representative: list[dict], language: str = "en"
     ) -> TrendDescription:
         kws = [k for k in keywords if k]
         title = ", ".join(w.capitalize() for w in kws[:3]) if kws else "Unlabeled trend"
@@ -63,15 +66,17 @@ class OpenAIDescriber:
         self._model_name = model_name
 
     def describe(
-        self, keywords: list[str], representative: list[dict]
+        self, keywords: list[str], representative: list[dict], language: str = "en"
     ) -> TrendDescription:
         context = "\n".join(
             f"- {r.get('title', '')}: {r.get('text', '')[:400]}"
             for r in representative[:6]
         )
+        lang_name = _LANGUAGE_NAMES.get(language, "English")
         prompt = (
             "You are a foresight analyst. Based ONLY on the sources below, write a "
             "concise trend title (max 8 words) and a 2-3 sentence summary. "
+            f"Write the title and summary in {lang_name}. "
             "Do not invent facts beyond the sources.\n"
             f"Keywords: {', '.join(keywords)}\nSources:\n{context}\n\n"
             'Respond as JSON: {"title": "...", "summary": "..."}'
