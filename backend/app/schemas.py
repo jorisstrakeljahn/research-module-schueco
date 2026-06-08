@@ -30,17 +30,31 @@ class TrendOut(BaseModel):
     title: str
     summary: str
     maturity: str | None
+    emergence: float | None = None
     keywords: list[str]
     size: int
+    region: str | None = None
+    country: str | None = None
     pestel: list[str] | None = None
+    category: str | None = None
     impact: float | None = None
+    urgency: float | None = None
     uncertainty: float | None = None
     radar_stage: str | None = None
 
 
 class TrendDetailOut(TrendOut):
+    rationale: str | None = None
     evidence: list[dict] = []
     timeseries: list[TimepointOut] = []
+
+
+class RunRequest(BaseModel):
+    keywords: list[str] = []
+    query: str | None = None
+    limit: int = 50
+    language: str = "en"  # en | de — language of generated trend text
+    mode: str = "deep_research"  # deep_research | simple
 
 
 class FeedbackIn(BaseModel):
@@ -55,3 +69,58 @@ class FeedbackOut(BaseModel):
     id: int
     trend_id: int
     action: str
+
+
+class TranslateIn(BaseModel):
+    language: str = "en"  # target language: en | de
+
+
+class TranslateOut(BaseModel):
+    language: str
+    title: str
+    summary: str
+    rationale: str | None = None
+
+
+class ReferenceTrendIn(BaseModel):
+    title: str
+    keywords: list[str] = []
+    pestel: list[str] | None = None
+    category: str | None = None
+    note: str | None = None
+
+
+class ReferenceTrendOut(BaseModel):
+    id: int
+    title: str
+    keywords: list[str]
+    pestel: list[str] | None = None
+    category: str | None = None
+    source: str
+    note: str | None = None
+
+
+class OverlapMatch(BaseModel):
+    reference_id: int
+    reference_title: str
+    trend_id: int
+    trend_title: str
+    score: float
+
+
+class ReferenceSummary(BaseModel):
+    id: int
+    title: str
+
+
+class EvaluationOut(BaseModel):
+    run_id: int | None
+    n_references: int
+    n_trends: int
+    matched_references: int
+    precision: float
+    recall: float
+    threshold: float
+    matches: list[OverlapMatch]
+    missed_references: list[ReferenceSummary]
+    novel_trends: list[ReferenceSummary]
