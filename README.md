@@ -1,28 +1,25 @@
-# Trendscout – AI-assisted Trend Scouting Platform (Schüco)
+# Trendscout
 
-Research module (M.Sc. Business Innovation & Technology, HSBI) · practice partner: Schüco International KG.
+AI-assisted trend-scouting platform — research module (M.Sc. Business Innovation &
+Technology, HSBI) with practice partner **Schüco International KG**.
 
-The platform ingests domain documents, structures them into topics, builds a
-retrospective time series, describes each topic as a **trend**, and lets a human
-expert review the result (human-in-the-loop). See `docs/` for the full plan and the
-scientific justification of every decision.
+It ingests domain documents (OpenAlex, arXiv, Firecrawl), clusters them into topics,
+builds a retrospective time series, describes each topic as a **trend** (RAG + LLM),
+assesses it (PESTEL · category · impact/urgency → Act/Prepare/Watch) and lets an expert
+review the result. The frontend renders a Schüco-style **Trendradar**.
 
-## Architecture (v0)
+Every pipeline stage has an **offline fallback** (runs with no API key) and a
+**scientific** implementation (Sentence-BERT, BERTopic, LLM).
 
 ```
-OpenAlex ─▶ Ingestion ─▶ Embeddings ─▶ Topic modeling ─▶ Time series ─▶ Trend description
-                                                                              │
-                          PostgreSQL + pgvector  ◀───────────────────────────┘
-                                   │
-                         FastAPI  ─▶  Next.js frontend (Trendradar + expert review)
+sources ─▶ ingest ─▶ embed ─▶ topics ─▶ time series ─▶ describe ─▶ classify (PESTEL/impact)
+                                  └── PostgreSQL + pgvector ──┘
+                          FastAPI  ─▶  Next.js (Trendradar + expert review)
 ```
-
-Each pipeline stage is pluggable with an **offline fallback** (runs with no API key)
-and a **scientific/production** implementation (Sentence-BERT, BERTopic, LLM).
 
 ## Prerequisites
 
-- Docker (for PostgreSQL + pgvector)
+- Docker (PostgreSQL + pgvector)
 - [uv](https://docs.astral.sh/uv/) (Python 3.11–3.13)
 - Node.js 20+
 
@@ -32,13 +29,16 @@ and a **scientific/production** implementation (Sentence-BERT, BERTopic, LLM).
 # 1. Database
 docker compose up -d db
 
-# 2. Backend (offline defaults: no API key needed)
+# 2. Backend (offline defaults — no API key needed)
 cd backend
 uv venv && uv pip install -e .
-uv run trendscout run "building facade adaptive" --limit 40   # one pipeline run
+cp .env.example .env
+
+uv run trendscout run "building facade adaptive" --limit 40   # one simple run
+uv run trendscout research                                    # bounded deep-research crawl
 uv run trendscout serve                                       # API on :8000
 
-# 3. Frontend (in a second terminal)
+# 3. Frontend (second terminal)
 cd frontend
 npm install
 npm run dev                                                   # UI on :3000
@@ -51,23 +51,26 @@ Open http://localhost:3000.
 ```bash
 cd backend
 docker compose up -d db      # DB-backed tests need this (otherwise auto-skipped)
-uv run pytest                # 19 tests
+uv run pytest
 uv run ruff check .
 ```
 
 ## Configuration
 
-Copy `backend/.env.example` to `backend/.env`. Secrets (LLM / Firecrawl keys) go in
-`.env` only and are never committed. To switch from the offline fallbacks to the
-scientific components:
+Copy `backend/.env.example` to `backend/.env`; secrets (LLM / Firecrawl keys) live in
+`.env` only. Switch from the offline fallbacks to the scientific components:
 
 ```bash
-uv pip install -e ".[ml,llm]"   # sentence-transformers, bertopic, openai
-# then in .env:  EMBEDDER=sentence_transformers  TOPIC_MODEL=bertopic  DESCRIBER=openai
+uv pip install -e ".[ml,llm]"
+# then in .env:
+#   EMBEDDER=sentence_transformers  TOPIC_MODEL=bertopic
+#   DESCRIBER=openai  CLASSIFIER=openai
+#   SOURCES=openalex,arxiv,firecrawl
 ```
 
-## Documentation
+## Layout
 
-- `docs/PROJEKTPLAN.md` – architecture, scope (MVP vs. later), data model, evaluation.
-- `docs/ENTSCHEIDUNGEN-BELEGE.md` – decision records (ADR-01…ADR-21) with citations.
-- `docs/LITERATUR-ORIENTIERUNG.md` – guiding literature (Fraunhofer 2025).
+```
+backend/   FastAPI app, ingestion connectors, analysis pipeline, CLI (uv)
+frontend/  Next.js + Tailwind UI (Trendradar, dashboard, expert review)
+```
