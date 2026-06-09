@@ -1,15 +1,83 @@
 @import "tailwindcss";
 
+/* Schüco theme. Semantic tokens (bg, surface, fg, border, …) are exposed as
+   Tailwind utilities via @theme but resolve to runtime CSS variables, so the
+   same utility (bg-bg, text-fg, …) adapts to light/dark automatically. The
+   `dark` class is toggled on <html> by next-themes. Brand/maturity/category
+   colours are intentionally constant across modes. */
+@theme {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-hover: var(--hover);
+
+  --color-primary: #00a651;
+  --color-primary-bright: #00d66f;
+  --color-primary-dim: #4d7c5e;
+
+  /* Maturity scale (Schüco green ramp) */
+  --color-megatrend: #00a651;
+  --color-established: #4d7c5e;
+  --color-emerging: #6b9a7a;
+  --color-weak: #8bb89d;
+
+  /* Thematic category palette (Schüco Trendradar) */
+  --color-climate: #2ba8e0;
+  --color-technology: #7fc241;
+  --color-digital: #d0021b;
+  --color-markets: #f5a623;
+}
+
+/* Light theme (default) */
 :root {
-  --background: #ffffff;
-  --foreground: #0f172a;
+  color-scheme: light;
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --surface-2: #eef1f4;
+  --border: rgba(15, 23, 42, 0.12);
+  --border-strong: rgba(15, 23, 42, 0.2);
+  --fg: #0f172a;
+  --muted: #475569;
+  --faint: #8a94a6;
+  --hover: rgba(15, 23, 42, 0.05);
+  --scrollbar: rgba(15, 23, 42, 0.2);
+  --ring-band: rgba(15, 23, 42, 0.04);
+  --ring-line: rgba(15, 23, 42, 0.16);
+}
+
+/* Dark theme */
+.dark {
+  color-scheme: dark;
+  --bg: #0b0b0b;
+  --surface: #1a1a1a;
+  --surface-2: #222222;
+  --border: rgba(255, 255, 255, 0.1);
+  --border-strong: rgba(255, 255, 255, 0.18);
+  --fg: #f5f5f5;
+  --muted: #9ca3af;
+  --faint: #6b7280;
+  --hover: rgba(255, 255, 255, 0.06);
+  --scrollbar: rgba(255, 255, 255, 0.15);
+  --ring-band: rgba(255, 255, 255, 0.04);
+  --ring-line: rgba(255, 255, 255, 0.15);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--bg);
+  color: var(--fg);
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
     Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+}
+
+/* Thin scrollbars that follow the theme */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar) transparent;
 }
