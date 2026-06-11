@@ -77,7 +77,12 @@ class OpenAIEmbedder:
     def embed(self, texts: list[str]) -> np.ndarray:
         if not texts:
             return np.zeros((0, self.dim), dtype=np.float32)
-        resp = self._client.embeddings.create(model=self._model_name, input=texts)
+        # text-embedding-3-* honor the `dimensions` parameter; without it the model
+        # always returns 1536 dims, which then collides with the vector(EMBEDDING_DIM)
+        # column on insert.
+        resp = self._client.embeddings.create(
+            model=self._model_name, input=texts, dimensions=self.dim
+        )
         return np.asarray([d.embedding for d in resp.data], dtype=np.float32)
 
 

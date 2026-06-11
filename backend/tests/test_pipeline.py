@@ -8,7 +8,7 @@ from types import SimpleNamespace
 import numpy as np
 
 from app.pipeline.describe import OpenAIDescriber, TemplateDescriber
-from app.pipeline.embeddings import HashingEmbedder, get_embedder
+from app.pipeline.embeddings import HashingEmbedder, OpenAIEmbedder, get_embedder
 from app.pipeline.timeseries import (
     build_topic_timepoints,
     classify_maturity,
@@ -41,6 +41,28 @@ def test_hashing_embedder_shape_and_determinism():
 
 def test_embedder_factory():
     assert isinstance(get_embedder("hashing", 64), HashingEmbedder)
+
+
+def test_openai_embedder_sends_requested_dimensions():
+    """The embedder must forward EMBEDDING_DIM so the vector column accepts it."""
+    captured: dict[str, object] = {}
+
+    def create(**kwargs: object) -> SimpleNamespace:
+        captured.update(kwargs)
+        n = len(kwargs["input"])
+        dim = kwargs["dimensions"]
+        return SimpleNamespace(
+            data=[SimpleNamespace(embedding=[0.0] * dim) for _ in range(n)]
+        )
+
+    emb = OpenAIEmbedder.__new__(OpenAIEmbedder)
+    emb._client = SimpleNamespace(embeddings=SimpleNamespace(create=create))
+    emb._model_name = "stub"
+    emb.dim = 384
+
+    out = emb.embed(["a", "b"])
+    assert captured["dimensions"] == 384
+    assert out.shape == (2, 384)
 
 
 def test_openai_describer_falls_back_when_api_fails():

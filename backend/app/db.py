@@ -48,6 +48,31 @@ def init_db() -> None:
                 )
             )
         conn.commit()
+    _check_embedding_dimension(engine)
+
+
+def _check_embedding_dimension(engine) -> None:
+    """Fail fast if the live ``chunk.embedding`` column dimension drifted from
+    ``EMBEDDING_DIM``. ``create_all`` never alters existing columns, so changing the
+    embedder without recreating the DB would otherwise fail late with a cryptic error.
+
+    For pgvector columns ``atttypmod`` holds the dimension directly (no offset).
+    """
+    expected = get_settings().embedding_dim
+    with engine.connect() as conn:
+        row = conn.execute(
+            text(
+                "SELECT atttypmod FROM pg_attribute "
+                "WHERE attrelid = 'chunk'::regclass AND attname = 'embedding'"
+            )
+        ).first()
+    if row and row[0] != -1 and row[0] != expected:
+        raise RuntimeError(
+            f"Embedding dimension mismatch: database column chunk.embedding is "
+            f"vector({row[0]}), but EMBEDDING_DIM={expected}. Either set "
+            f"EMBEDDING_DIM={row[0]} or recreate the database (data loss!) after "
+            f"changing the embedder."
+        )
 
 
 def get_session() -> Iterator[Session]:
