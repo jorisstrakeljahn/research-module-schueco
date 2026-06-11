@@ -31,7 +31,7 @@ docker compose up -d db
 
 # 2. Backend (offline defaults — no API key needed)
 cd backend
-uv venv && uv pip install -e .
+uv sync
 cp .env.example .env
 
 uv run trendscout run "building facade adaptive" --limit 40   # one simple run
@@ -61,7 +61,7 @@ Copy `backend/.env.example` to `backend/.env`; secrets (LLM / Firecrawl keys) li
 `.env` only. Switch from the offline fallbacks to the scientific components:
 
 ```bash
-uv pip install -e ".[ml,llm]"
+uv sync --extra ml --extra llm
 # then in .env:
 #   EMBEDDER=sentence_transformers  TOPIC_MODEL=bertopic
 #   DESCRIBER=openai  CLASSIFIER=openai
