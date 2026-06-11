@@ -12,6 +12,8 @@ import json
 import logging
 from typing import Protocol
 
+from app.llm import get_openai_client
+
 logger = logging.getLogger(__name__)
 
 
@@ -45,11 +47,7 @@ class LLMQueryExpander:
     """LLM-based query expansion. Requires the ``llm`` extra and an API key."""
 
     def __init__(self, model_name: str = "gpt-4o-mini") -> None:
-        from openai import OpenAI
-
-        from app.config import get_settings
-
-        self._client = OpenAI(api_key=get_settings().openai_api_key)
+        self._client = get_openai_client()
         self._model_name = model_name
 
     def expand(

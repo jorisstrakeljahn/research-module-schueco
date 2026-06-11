@@ -13,6 +13,8 @@ import logging
 from dataclasses import dataclass
 from typing import Protocol
 
+from app.llm import get_openai_client
+
 logger = logging.getLogger(__name__)
 
 
@@ -61,11 +63,7 @@ class OpenAIDescriber:
     """LLM-based, RAG-grounded description. Requires ``llm`` extra and an API key."""
 
     def __init__(self, model_name: str = "gpt-4o-mini") -> None:
-        from openai import OpenAI
-
-        from app.config import get_settings
-
-        self._client = OpenAI(api_key=get_settings().openai_api_key)
+        self._client = get_openai_client()
         self._model_name = model_name
         self._fallback = TemplateDescriber()
 

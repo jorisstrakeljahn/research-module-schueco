@@ -20,6 +20,7 @@ import json
 from dataclasses import dataclass, field
 from typing import Protocol
 
+from app.llm import get_openai_client
 from app.models import PESTEL_DIMENSIONS, TREND_CATEGORIES
 from app.pipeline.timeseries import growth_ratio
 
@@ -206,11 +207,7 @@ class OpenAIClassifier:
     """
 
     def __init__(self, model_name: str = "gpt-4o-mini") -> None:
-        from openai import OpenAI
-
-        from app.config import get_settings
-
-        self._client = OpenAI(api_key=get_settings().openai_api_key)
+        self._client = get_openai_client()
         self._model_name = model_name
         self._fallback = HeuristicClassifier()
 

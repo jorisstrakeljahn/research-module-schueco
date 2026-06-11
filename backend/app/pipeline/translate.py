@@ -13,6 +13,8 @@ import json
 from dataclasses import dataclass
 from typing import Protocol
 
+from app.llm import get_openai_client
+
 _LANGUAGE_NAMES = {"de": "German", "en": "English"}
 
 
@@ -43,11 +45,7 @@ class OpenAITranslator:
     """LLM translation with a fixed JSON schema. Requires an API key."""
 
     def __init__(self, model_name: str = "gpt-4o-mini") -> None:
-        from openai import OpenAI
-
-        from app.config import get_settings
-
-        self._client = OpenAI(api_key=get_settings().openai_api_key)
+        self._client = get_openai_client()
         self._model_name = model_name
         self._fallback = NoopTranslator()
 

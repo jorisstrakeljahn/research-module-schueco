@@ -15,6 +15,7 @@ import re
 from typing import Protocol
 
 from app.ingestion.base import RawDocument
+from app.llm import get_openai_client
 
 logger = logging.getLogger(__name__)
 
@@ -80,11 +81,7 @@ class LLMRelevance:
         model_name: str = "gpt-4o-mini",
         batch_size: int = 20,
     ) -> None:
-        from openai import OpenAI
-
-        from app.config import get_settings
-
-        self._client = OpenAI(api_key=get_settings().openai_api_key)
+        self._client = get_openai_client()
         self._domain = domain
         self._exclude = exclude_terms or []
         self._model_name = model_name

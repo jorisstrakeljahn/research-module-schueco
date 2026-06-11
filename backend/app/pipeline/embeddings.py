@@ -6,6 +6,8 @@ from typing import Protocol
 
 import numpy as np
 
+from app.llm import get_openai_client
+
 
 class Embedder(Protocol):
     """Turns texts into a 2-D float array of shape ``(n_texts, dim)``."""
@@ -66,11 +68,7 @@ class OpenAIEmbedder:
     """Embeddings via the OpenAI API. Requires the ``llm`` extra and an API key."""
 
     def __init__(self, dim: int = 1536, model_name: str = "text-embedding-3-small") -> None:
-        from openai import OpenAI
-
-        from app.config import get_settings
-
-        self._client = OpenAI(api_key=get_settings().openai_api_key)
+        self._client = get_openai_client()
         self._model_name = model_name
         self.dim = dim
 
