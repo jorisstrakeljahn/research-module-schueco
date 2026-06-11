@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from sqlmodel import Session
 
 from app.config import Settings, get_settings
-from app.ingestion.base import Connector, RawDocument
+from app.ingestion.base import Connector, RawDocument, dedupe
 from app.models import Run
 from app.pipeline.run import run_pipeline
 from app.research.crawler import DeepResearchCrawler
@@ -40,18 +40,6 @@ class ResearchOutcome:
     seeds: list[str]
     queries_used: list[str]
     rounds: int
-
-
-def _dedupe(raw_docs: list[RawDocument]) -> list[RawDocument]:
-    seen: set[str] = set()
-    unique: list[RawDocument] = []
-    for doc in raw_docs:
-        key = (doc.external_id or doc.url or doc.title or "").strip().lower()
-        if not key or key in seen:
-            continue
-        seen.add(key)
-        unique.append(doc)
-    return unique
 
 
 def run_simple_search(
@@ -84,7 +72,7 @@ def run_simple_search(
                 exc_info=True,
             )
             continue
-    raw_docs = _dedupe(fetched)
+    raw_docs = dedupe(fetched)
 
     return run_pipeline(
         query,

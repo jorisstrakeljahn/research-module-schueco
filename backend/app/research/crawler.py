@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from app.ingestion.base import Connector, RawDocument
+from app.ingestion.base import Connector, RawDocument, doc_key
 from app.research.expand import NoopExpander, QueryExpander
 from app.research.relevance import PassthroughRelevance, RelevanceFilter
 
@@ -25,10 +25,6 @@ class CrawlResult:
     documents: list[RawDocument]
     queries_used: list[str] = field(default_factory=list)
     rounds: int = 0
-
-
-def _doc_key(doc: RawDocument) -> str:
-    return (doc.external_id or doc.url or doc.title or "").strip().lower()
 
 
 class DeepResearchCrawler:
@@ -85,7 +81,7 @@ class DeepResearchCrawler:
             unique: list[RawDocument] = []
             seen = set(collected.keys())
             for doc in fetched:
-                key = _doc_key(doc)
+                key = doc_key(doc)
                 if not key or key in seen:
                     continue
                 seen.add(key)
@@ -96,7 +92,7 @@ class DeepResearchCrawler:
             for doc in kept:
                 if len(collected) >= self.max_docs:
                     break
-                collected[_doc_key(doc)] = doc
+                collected[doc_key(doc)] = doc
 
             # 4. expand the frontier for the next round
             if round_index < self.max_rounds - 1 and len(collected) < self.max_docs:

@@ -45,6 +45,24 @@ class RawDocument(BaseModel):
     source_type: str = "science"
 
 
+def doc_key(doc: RawDocument) -> str:
+    """Stable identity key for de-duplication (external id, else url, else title)."""
+    return (doc.external_id or doc.url or doc.title or "").strip().lower()
+
+
+def dedupe(docs: list[RawDocument]) -> list[RawDocument]:
+    """Drop documents sharing a :func:`doc_key`, keeping first occurrence order."""
+    seen: set[str] = set()
+    unique: list[RawDocument] = []
+    for doc in docs:
+        key = doc_key(doc)
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        unique.append(doc)
+    return unique
+
+
 class Connector(Protocol):
     """A source connector fetches raw documents for a query."""
 
