@@ -65,8 +65,14 @@ def _database_available() -> bool:
         return False
 
 
+_db_available = _database_available()
+if os.environ.get("CI") and not _db_available:
+    raise RuntimeError(
+        "CI requires the Postgres service (db-backed tests must not be skipped)"
+    )
+
 requires_db = pytest.mark.skipif(
-    not _database_available(),
+    not _db_available,
     reason="Postgres not reachable (run: docker compose up -d db)",
 )
 
