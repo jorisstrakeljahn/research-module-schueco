@@ -19,6 +19,7 @@ from app.models import (
     TopicTimepoint,
     Trend,
     TrendAssessment,
+    TrendTranslation,
 )
 from app.schemas import (
     EvaluationOut,
@@ -106,11 +107,9 @@ def _latest_completed_run_id(session: Session) -> int | None:
     return run.id if run else None
 
 
-def _trend_to_out(session: Session, trend: Trend) -> TrendOut:
-    topic = session.get(Topic, trend.topic_id)
-    assessment = session.exec(
-        select(TrendAssessment).where(TrendAssessment.trend_id == trend.id)
-    ).first()
+def _to_trend_out(
+    trend: Trend, topic: Topic, assessment: TrendAssessment | None
+) -> TrendOut:
     return TrendOut(
         id=trend.id,
         run_id=trend.run_id,
@@ -129,6 +128,28 @@ def _trend_to_out(session: Session, trend: Trend) -> TrendOut:
         uncertainty=assessment.uncertainty if assessment else None,
         radar_stage=assessment.radar_stage if assessment else None,
     )
+
+
+def _trends_with_relations(
+    session: Session,
+    run_id: int,
+    *,
+    maturity: str | None = None,
+    region: str | None = None,
+) -> list[tuple[Trend, Topic, TrendAssessment | None]]:
+    """Fetch (Trend, Topic, TrendAssessment?) tuples in a single joined query,
+    avoiding the previous 1 + 2N round-trips per trend."""
+    query = (
+        select(Trend, Topic, TrendAssessment)
+        .join(Topic, Topic.id == Trend.topic_id)
+        .outerjoin(TrendAssessment, TrendAssessment.trend_id == Trend.id)
+        .where(Trend.run_id == run_id)
+    )
+    if maturity:
+        query = query.where(Trend.maturity == maturity)
+    if region:
+        query = query.where(Topic.region == region)
+    return session.exec(query).all()
 
 
 @router.get("/health")
@@ -174,28 +195,24 @@ def list_trends(
         run_id = _latest_completed_run_id(session)
     if run_id is None:
         return []
-    query = select(Trend).where(Trend.run_id == run_id)
-    if maturity:
-        query = query.where(Trend.maturity == maturity)
-    if region:
-        query = query.join(Topic, Topic.id == Trend.topic_id).where(
-            Topic.region == region
-        )
-    trends = session.exec(query).all()
-    return [_trend_to_out(session, t) for t in trends]
+    rows = _trends_with_relations(session, run_id, maturity=maturity, region=region)
+    return [_to_trend_out(trend, topic, assessment) for trend, topic, assessment in rows]
 
 
 @router.get("/trends/{trend_id}", response_model=TrendDetailOut)
 def get_trend(
     trend_id: int, session: Session = Depends(get_session)
 ) -> TrendDetailOut:
-    trend = session.get(Trend, trend_id)
-    if not trend:
-        raise HTTPException(status_code=404, detail="Trend not found")
-    base = _trend_to_out(session, trend)
-    assessment = session.exec(
-        select(TrendAssessment).where(TrendAssessment.trend_id == trend.id)
+    row = session.exec(
+        select(Trend, Topic, TrendAssessment)
+        .join(Topic, Topic.id == Trend.topic_id)
+        .outerjoin(TrendAssessment, TrendAssessment.trend_id == Trend.id)
+        .where(Trend.id == trend_id)
     ).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Trend not found")
+    trend, topic, assessment = row
+    base = _to_trend_out(trend, topic, assessment)
     timepoints = session.exec(
         select(TopicTimepoint)
         .where(TopicTimepoint.topic_id == trend.topic_id)
@@ -256,6 +273,23 @@ def translate_trend(
     trend = session.get(Trend, trend_id)
     if not trend:
         raise HTTPException(status_code=404, detail="Trend not found")
+
+    # Trend text is immutable per run, so a translation can be cached: a repeated
+    # "show translation" toggle must not re-buy the same paid LLM call.
+    cached = session.exec(
+        select(TrendTranslation).where(
+            TrendTranslation.trend_id == trend.id,
+            TrendTranslation.language == body.language,
+        )
+    ).first()
+    if cached:
+        return TranslateOut(
+            language=cached.language,
+            title=cached.title,
+            summary=cached.summary,
+            rationale=cached.rationale,
+        )
+
     assessment = session.exec(
         select(TrendAssessment).where(TrendAssessment.trend_id == trend.id)
     ).first()
@@ -267,6 +301,16 @@ def translate_trend(
         rationale=assessment.rationale if assessment else None,
         language=body.language,
     )
+    session.add(
+        TrendTranslation(
+            trend_id=trend.id,
+            language=body.language,
+            title=result.title,
+            summary=result.summary,
+            rationale=result.rationale,
+        )
+    )
+    session.commit()
     return TranslateOut(
         language=body.language,
         title=result.title,
@@ -336,14 +380,17 @@ def evaluation_overlap(
 
     trends: list[TrendLike] = []
     if run_id is not None:
-        rows = session.exec(select(Trend).where(Trend.run_id == run_id)).all()
-        for trend in rows:
-            topic = session.get(Topic, trend.topic_id)
+        rows = session.exec(
+            select(Trend, Topic)
+            .join(Topic, Topic.id == Trend.topic_id)
+            .where(Trend.run_id == run_id)
+        ).all()
+        for trend, topic in rows:
             trends.append(
                 TrendLike(
                     id=trend.id,
                     title=trend.title,
-                    keywords=(topic.keywords or []) if topic else [],
+                    keywords=topic.keywords or [],
                 )
             )
 

@@ -2,13 +2,51 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import event
 from sqlmodel import select
 
+from app.db import get_engine
 from app.main import app
 from app.models import Run, Topic, TopicTimepoint, Trend, TrendAssessment
 from tests.conftest import requires_db
+
+
+def _seed_run_with_trends(session, n: int) -> Run:
+    run = Run(status="completed", n_topics=n)
+    session.add(run)
+    session.commit()
+    session.refresh(run)
+    for i in range(n):
+        topic = Topic(
+            run_id=run.id,
+            topic_index=i,
+            label=f"topic {i}",
+            keywords=["facade", "envelope"],
+            size=2,
+            region="Europe" if i == 0 else None,
+        )
+        session.add(topic)
+        session.commit()
+        session.refresh(topic)
+        trend = Trend(
+            topic_id=topic.id,
+            run_id=run.id,
+            title=f"Trend {i}",
+            summary="s",
+            maturity="emerging",
+        )
+        session.add(trend)
+        session.commit()
+        session.refresh(trend)
+        session.add(
+            TrendAssessment(trend_id=trend.id, radar_stage="watch", pestel=["T"])
+        )
+    session.commit()
+    return run
 
 
 @pytest.fixture
@@ -240,3 +278,61 @@ def test_invalid_maturity_correction_is_422(client, session):
 
     match = next(t for t in client.get("/trends").json() if t["id"] == trend.id)
     assert match["maturity"] == "emerging"
+
+
+@requires_db
+def test_translate_is_cached(client, session, monkeypatch):
+    trend = _seed(session)
+
+    class _CountingTranslator:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def translate(self, *, title, summary, rationale, language):
+            self.calls += 1
+            return SimpleNamespace(
+                title=f"{title} [{language}]", summary=summary, rationale=rationale
+            )
+
+    stub = _CountingTranslator()
+    monkeypatch.setattr(
+        "app.pipeline.translate.resolve_translator", lambda settings: stub
+    )
+
+    first = client.post(f"/trends/{trend.id}/translate", json={"language": "de"})
+    second = client.post(f"/trends/{trend.id}/translate", json={"language": "de"})
+
+    assert first.status_code == 200 and second.status_code == 200
+    assert first.json() == second.json()
+    assert stub.calls == 1  # second request served from the persisted translation
+
+
+@requires_db
+def test_trends_listing_avoids_n_plus_one(client, session):
+    run = _seed_run_with_trends(session, 3)
+
+    selects: list[str] = []
+
+    def _count(conn, cursor, statement, *args, **kwargs):
+        if statement.lstrip().upper().startswith("SELECT"):
+            selects.append(statement)
+
+    engine = get_engine()
+    event.listen(engine, "before_cursor_execute", _count)
+    try:
+        resp = client.get("/trends", params={"run_id": run.id})
+    finally:
+        event.remove(engine, "before_cursor_execute", _count)
+
+    assert resp.status_code == 200
+    assert len(resp.json()) == 3
+    # one joined select, not 1 + 2N round-trips
+    assert len(selects) <= 3, f"expected no N+1, got {len(selects)} selects"
+
+
+@requires_db
+def test_trends_region_filter(client, session):
+    run = _seed_run_with_trends(session, 3)
+    europe = client.get("/trends", params={"run_id": run.id, "region": "Europe"}).json()
+    assert len(europe) == 1
+    assert all(t["region"] == "Europe" for t in europe)

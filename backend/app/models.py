@@ -230,3 +230,17 @@ class ExpertFeedback(SQLModel, table=True):
     created_at: datetime = Field(default_factory=_utcnow)
 
     trend: Trend | None = Relationship(back_populates="feedback")
+
+
+class TrendTranslation(SQLModel, table=True):
+    """Cached on-demand translation of a trend (trend text is immutable per run)."""
+
+    __tablename__ = "trend_translation"
+
+    id: int | None = Field(default=None, primary_key=True)
+    trend_id: int = Field(foreign_key="trend.id", index=True)
+    language: str
+    title: str
+    summary: str = ""
+    rationale: str | None = None
+    created_at: datetime = Field(default_factory=_utcnow)
