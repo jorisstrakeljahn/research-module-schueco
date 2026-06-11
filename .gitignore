@@ -23,3 +23,7 @@ npm-debug.log*
 
 # OS / editor
 .DS_Store
+
+# Project docs kept local only (thesis project plan, ADRs/decision log,
+# literature, Schüco partner reference) — intentionally not versioned here.
+/docs/
