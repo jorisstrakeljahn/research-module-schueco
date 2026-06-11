@@ -28,6 +28,7 @@ def get_engine():
 _ADDITIVE_COLUMNS: tuple[tuple[str, str, str], ...] = (
     ("topic", "region", "VARCHAR"),
     ("topic", "country", "VARCHAR"),
+    ("run", "error", "VARCHAR"),
 )
 
 

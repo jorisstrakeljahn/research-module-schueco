@@ -9,8 +9,11 @@ default once the ``llm`` extra and an API key are available (ADR-11).
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass
 from typing import Protocol
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -64,6 +67,7 @@ class OpenAIDescriber:
 
         self._client = OpenAI(api_key=get_settings().openai_api_key)
         self._model_name = model_name
+        self._fallback = TemplateDescriber()
 
     def describe(
         self, keywords: list[str], representative: list[dict], language: str = "en"
@@ -81,12 +85,20 @@ class OpenAIDescriber:
             f"Keywords: {', '.join(keywords)}\nSources:\n{context}\n\n"
             'Respond as JSON: {"title": "...", "summary": "..."}'
         )
-        resp = self._client.chat.completions.create(
-            model=self._model_name,
-            messages=[{"role": "user", "content": prompt}],
-            response_format={"type": "json_object"},
-        )
-        data = json.loads(resp.choices[0].message.content)
+        try:
+            resp = self._client.chat.completions.create(
+                model=self._model_name,
+                messages=[{"role": "user", "content": prompt}],
+                response_format={"type": "json_object"},
+            )
+            data = json.loads(resp.choices[0].message.content)
+        except Exception:
+            # A single LLM/API hiccup must not abort the whole pipeline run; fall
+            # back to the deterministic template description (ADR-11).
+            logger.warning(
+                "OpenAI describe failed; using template fallback", exc_info=True
+            )
+            return self._fallback.describe(keywords, representative, language=language)
         return TrendDescription(
             title=data.get("title", "").strip() or "Unlabeled trend",
             summary=data.get("summary", "").strip(),

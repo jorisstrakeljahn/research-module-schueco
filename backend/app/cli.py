@@ -2,11 +2,18 @@
 
 from __future__ import annotations
 
+import logging
+
 import typer
 from sqlmodel import Session
 
 from app.config import get_settings
 from app.db import get_engine, init_db
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
 
 app = typer.Typer(help="Trendscout backend CLI")
 

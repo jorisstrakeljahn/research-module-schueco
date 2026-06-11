@@ -121,6 +121,7 @@ class Run(SQLModel, table=True):
     params: dict | None = Field(default=None, sa_column=Column(JSONB))
     n_documents: int = 0
     n_topics: int = 0
+    error: str | None = None  # populated when status == "failed"
 
     topics: list["Topic"] = Relationship(back_populates="run")
 

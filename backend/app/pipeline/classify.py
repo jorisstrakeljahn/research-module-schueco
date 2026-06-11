@@ -241,19 +241,27 @@ class OpenAIClassifier:
             return self._fallback.classify(signal)
 
         base = self._fallback.classify(signal)
-        pestel = [p for p in data.get("pestel", []) if p in PESTEL_DIMENSIONS][:2]
-        category = data.get("category")
-        if category not in TREND_CATEGORIES:
-            category = base.category
+        # The LLM output is untrusted: a non-list ``pestel`` or non-numeric score
+        # must degrade to the heuristic rather than crash the whole run.
+        try:
+            raw_pestel = data.get("pestel", [])
+            if not isinstance(raw_pestel, list):
+                raw_pestel = []
+            pestel = [p for p in raw_pestel if p in PESTEL_DIMENSIONS][:2]
+            category = data.get("category")
+            if category not in TREND_CATEGORIES:
+                category = base.category
+            llm_impact = _clamp(float(data.get("impact", 5)))
+            llm_urgency = _clamp(float(data.get("urgency", 5)))
+            llm_uncertainty = _clamp(float(data.get("uncertainty", 5)))
+        except (TypeError, ValueError):
+            return base
 
         # Blend the LLM judgement with corpus-derived signals (maturity, growth,
         # novelty, source count). The LLM alone tends to cluster every building trend
         # around the same impact/urgency; mixing in the heuristic - which varies by
         # maturity and emergence - restores the spread the radar needs and matches the
         # "LLM + Heuristiken" design (ADR-26, project plan §8.7).
-        llm_impact = _clamp(float(data.get("impact", 5)))
-        llm_urgency = _clamp(float(data.get("urgency", 5)))
-        llm_uncertainty = _clamp(float(data.get("uncertainty", 5)))
         impact = _clamp(0.6 * llm_impact + 0.4 * base.impact)
         urgency = _clamp(0.5 * llm_urgency + 0.5 * base.urgency)
         uncertainty = _clamp(0.5 * llm_uncertainty + 0.5 * base.uncertainty)

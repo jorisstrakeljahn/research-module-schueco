@@ -6,6 +6,7 @@ the process reproducible and enables run-to-run delta comparison (ADR-16/19).
 
 from __future__ import annotations
 
+import logging
 from datetime import UTC, datetime
 
 import numpy as np
@@ -31,6 +32,8 @@ from app.pipeline.emergence import compute_emergence
 from app.pipeline.retrieval import PgVectorRetriever, topic_centroid
 from app.pipeline.timeseries import build_topic_timepoints, classify_maturity
 from app.pipeline.topics import get_topic_modeler
+
+logger = logging.getLogger(__name__)
 
 
 def _previous_topic_centroids(session: Session, current_run_id: int) -> list[np.ndarray]:
@@ -234,6 +237,11 @@ def run_pipeline(
                 try:
                     representative = retriever.retrieve(centroid, k=6)
                 except Exception:
+                    logger.warning(
+                        "Retrieval failed for topic %s; falling back to in-cluster docs",
+                        info.topic_index,
+                        exc_info=True,
+                    )
                     representative = []
             if not representative:
                 representative = [
@@ -307,9 +315,16 @@ def run_pipeline(
         session.commit()
         session.refresh(run)
         return run
-    except Exception:
+    except Exception as exc:
+        # The session may be in a pending-rollback state (e.g. a failed flush),
+        # so roll back FIRST - before touching any ORM attribute or committing -
+        # otherwise the status commit raises PendingRollbackError and masks the
+        # original exception.
+        session.rollback()
         run.status = "failed"
         run.finished_at = datetime.now(UTC)
+        run.error = f"{type(exc).__name__}: {exc}"[:500]
         session.add(run)
         session.commit()
+        logger.exception("Pipeline run %s failed", run.id)
         raise

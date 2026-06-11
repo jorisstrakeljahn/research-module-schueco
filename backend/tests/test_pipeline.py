@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from types import SimpleNamespace
 
 import numpy as np
 
-from app.pipeline.describe import TemplateDescriber
+from app.pipeline.describe import OpenAIDescriber, TemplateDescriber
 from app.pipeline.embeddings import HashingEmbedder, get_embedder
 from app.pipeline.timeseries import (
     build_topic_timepoints,
@@ -40,6 +41,28 @@ def test_hashing_embedder_shape_and_determinism():
 
 def test_embedder_factory():
     assert isinstance(get_embedder("hashing", 64), HashingEmbedder)
+
+
+def test_openai_describer_falls_back_when_api_fails():
+    """A single LLM failure must not abort the run; the template fills in."""
+
+    def boom(**_: object) -> object:
+        raise RuntimeError("api down")
+
+    describer = OpenAIDescriber.__new__(OpenAIDescriber)
+    describer._client = SimpleNamespace(
+        chat=SimpleNamespace(completions=SimpleNamespace(create=boom))
+    )
+    describer._model_name = "stub"
+    describer._fallback = TemplateDescriber()
+
+    result = describer.describe(
+        ["facade", "energy"],
+        [{"title": "Source A", "text": "insulation envelope", "url": "http://x"}],
+        language="en",
+    )
+    assert result.title
+    assert result.summary
 
 
 def test_simple_topic_modeler_separates_clusters():

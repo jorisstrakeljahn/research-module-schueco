@@ -14,6 +14,7 @@ OpenAlex while the real pipeline lived in the CLI.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 
 from sqlmodel import Session
@@ -27,6 +28,8 @@ from app.research.expand import get_expander
 from app.research.feedback import negative_terms_from_feedback, seeds_from_feedback
 from app.research.relevance import get_relevance
 from app.research.seeds import load_seeds, merge_seeds
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -74,6 +77,12 @@ def run_simple_search(
         try:
             fetched.extend(connector.fetch(query, limit=per_limit))
         except Exception:
+            logger.warning(
+                "Connector %s failed for query %r; skipping",
+                getattr(connector, "source_name", type(connector).__name__),
+                query,
+                exc_info=True,
+            )
             continue
     raw_docs = _dedupe(fetched)
 

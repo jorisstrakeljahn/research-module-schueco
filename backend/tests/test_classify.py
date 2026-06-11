@@ -2,13 +2,37 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 from app.models import PESTEL_DIMENSIONS, TREND_CATEGORIES
 from app.pipeline.classify import (
     HeuristicClassifier,
+    OpenAIClassifier,
     TrendSignal,
     get_classifier,
     radar_stage,
 )
+
+
+def _stub_client(content: str) -> SimpleNamespace:
+    """A minimal stand-in for the OpenAI client returning a fixed JSON payload."""
+
+    def create(**_: object) -> SimpleNamespace:
+        return SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content=content))]
+        )
+
+    return SimpleNamespace(
+        chat=SimpleNamespace(completions=SimpleNamespace(create=create))
+    )
+
+
+def _openai_classifier(content: str) -> OpenAIClassifier:
+    clf = OpenAIClassifier.__new__(OpenAIClassifier)
+    clf._client = _stub_client(content)
+    clf._model_name = "stub"
+    clf._fallback = HeuristicClassifier()
+    return clf
 
 
 def test_radar_stage_thresholds():
@@ -62,3 +86,36 @@ def test_novel_low_source_trend_is_more_uncertain():
 
 def test_classifier_factory():
     assert isinstance(get_classifier("heuristic"), HeuristicClassifier)
+
+
+def test_openai_classifier_falls_back_on_non_numeric_scores():
+    """Non-numeric LLM scores must degrade to the heuristic, not crash the run."""
+    sig = TrendSignal(
+        keywords=["ai", "automation"], title="AI planning", maturity="emerging", size=5
+    )
+    clf = _openai_classifier(
+        '{"impact": "high", "urgency": "soon", "uncertainty": "low",'
+        ' "category": "digital", "pestel": ["technological"]}'
+    )
+    result = clf.classify(sig)
+    expected = HeuristicClassifier().classify(sig)
+
+    assert result.impact == expected.impact
+    assert result.urgency == expected.urgency
+    assert result.uncertainty == expected.uncertainty
+    assert all(p in PESTEL_DIMENSIONS for p in result.pestel)
+
+
+def test_openai_classifier_ignores_string_pestel():
+    """A bare string for ``pestel`` must not be iterated character by character."""
+    sig = TrendSignal(
+        keywords=["ai", "automation"], title="AI planning", maturity="emerging", size=5
+    )
+    clf = _openai_classifier(
+        '{"impact": 7, "urgency": 6, "uncertainty": 4,'
+        ' "category": "digital", "pestel": "technological"}'
+    )
+    result = clf.classify(sig)
+
+    assert result.pestel
+    assert all(p in PESTEL_DIMENSIONS for p in result.pestel)

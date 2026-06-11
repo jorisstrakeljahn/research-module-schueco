@@ -4,19 +4,25 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from sqlmodel import select
+import numpy as np
+import pytest
+from sqlalchemy.exc import SQLAlchemyError
+from sqlmodel import Session, select
 
+from app.db import get_engine
 from app.ingestion.base import RawDocument
 from app.models import (
     PESTEL_DIMENSIONS,
     RADAR_STAGES,
     TREND_CATEGORIES,
     Chunk,
+    Run,
     Topic,
     TopicTimepoint,
     Trend,
     TrendAssessment,
 )
+from app.pipeline import run as run_module
 from app.pipeline.run import run_pipeline
 from tests.conftest import requires_db
 
@@ -102,6 +108,42 @@ def test_run_pipeline_end_to_end(session):
         assert a.category in TREND_CATEGORIES
         assert 1.0 <= a.impact <= 10.0 and 1.0 <= a.urgency <= 10.0
         assert a.radar_stage in RADAR_STAGES
+
+
+@requires_db
+def test_run_pipeline_completes_with_no_documents(session):
+    """An empty corpus is a valid (degenerate) run, not a crash."""
+    run = run_pipeline(
+        "buildings", session=session, limit=50, connector=FakeConnector([])
+    )
+    assert run.status == "completed"
+    assert run.n_documents == 0
+    assert run.n_topics == 0
+
+
+@requires_db
+def test_run_pipeline_rolls_back_and_persists_failed_on_db_error(session, monkeypatch):
+    """A mid-pipeline DB error must roll back, persist ``failed`` + ``error``,
+    and re-raise the original exception (not a PendingRollbackError)."""
+
+    class BadEmbedder:
+        dim = 999
+
+        def embed(self, texts: list[str]) -> np.ndarray:
+            return np.zeros((len(texts), 999), dtype=np.float32)
+
+    monkeypatch.setattr(run_module, "get_embedder", lambda *a, **k: BadEmbedder())
+
+    with pytest.raises(SQLAlchemyError):
+        run_pipeline(
+            "buildings", session=session, limit=50, connector=FakeConnector(_make_docs())
+        )
+
+    with Session(get_engine()) as verify:
+        runs = verify.exec(select(Run).order_by(Run.id.desc())).all()
+    assert runs, "the run row must be persisted"
+    assert runs[0].status == "failed"
+    assert runs[0].error
 
 
 @requires_db
