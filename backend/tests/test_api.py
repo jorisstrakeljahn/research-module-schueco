@@ -182,6 +182,36 @@ def test_feedback(client, session):
 
 
 @requires_db
+def test_invalid_mode_is_422(client):
+    resp = client.post("/runs", json={"keywords": ["x"], "mode": "bogus"})
+    assert resp.status_code == 422
+
+
+@requires_db
+def test_oversized_keywords_is_422(client):
+    resp = client.post("/runs", json={"keywords": [f"k{i}" for i in range(11)]})
+    assert resp.status_code == 422
+
+
+@requires_db
+def test_state_changing_route_requires_token_when_set(client, session, monkeypatch):
+    from app.config import get_settings
+
+    trend = _seed(session)
+    monkeypatch.setattr(get_settings(), "api_token", "secret")
+
+    missing = client.post(f"/trends/{trend.id}/feedback", json={"action": "confirm"})
+    assert missing.status_code == 401
+
+    ok = client.post(
+        f"/trends/{trend.id}/feedback",
+        json={"action": "confirm"},
+        headers={"Authorization": "Bearer secret"},
+    )
+    assert ok.status_code == 200
+
+
+@requires_db
 def test_maturity_correction_persists(client, session):
     trend = _seed(session)  # seeded as "emerging"
     resp = client.post(

@@ -3,6 +3,13 @@
 export const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE ?? "http://127.0.0.1:8000";
 
+const API_TOKEN = process.env.NEXT_PUBLIC_API_TOKEN ?? "";
+
+// Bearer header for state-changing requests. Empty token = no header (local dev).
+function authHeaders(): Record<string, string> {
+  return API_TOKEN ? { Authorization: `Bearer ${API_TOKEN}` } : {};
+}
+
 export type Maturity =
   | "weak_signal"
   | "emerging"
@@ -80,7 +87,7 @@ export async function startRun(
 ): Promise<{ query: string; language: string; mode: RunMode }> {
   const res = await fetch(`${API_BASE}/runs`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({ keywords, language, mode }),
   });
   if (!res.ok) throw new Error(`Start run failed: ${res.status}`);
@@ -98,7 +105,7 @@ export async function translateTrend(
 }> {
   const res = await fetch(`${API_BASE}/trends/${trendId}/translate`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({ language }),
   });
   if (!res.ok) throw new Error(`Translate failed: ${res.status}`);
@@ -117,7 +124,7 @@ export async function sendFeedback(
 ): Promise<void> {
   const res = await fetch(`${API_BASE}/trends/${trendId}/feedback`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(`Feedback failed: ${res.status}`);

@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class RunOut(BaseModel):
@@ -51,15 +52,15 @@ class TrendDetailOut(TrendOut):
 
 
 class RunRequest(BaseModel):
-    keywords: list[str] = []
-    query: str | None = None
-    limit: int = 50
-    language: str = "en"  # en | de — language of generated trend text
-    mode: str = "deep_research"  # deep_research | simple
+    keywords: list[str] = Field(default=[], max_length=10)
+    query: str | None = Field(default=None, max_length=300)
+    limit: int = Field(default=50, ge=1, le=200)
+    language: Literal["en", "de"] = "en"
+    mode: Literal["deep_research", "simple"] = "deep_research"
 
 
 class FeedbackIn(BaseModel):
-    action: str  # "confirm" | "correct" | "reject"
+    action: Literal["confirm", "correct", "reject"]
     field: str | None = None
     old_value: str | None = None
     new_value: str | None = None
@@ -73,7 +74,7 @@ class FeedbackOut(BaseModel):
 
 
 class TranslateIn(BaseModel):
-    language: str = "en"  # target language: en | de
+    language: Literal["en", "de"] = "en"
 
 
 class TranslateOut(BaseModel):

@@ -49,6 +49,9 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     firecrawl_api_key: str = ""
 
+    # Shared bearer token for state-changing routes; empty = auth disabled (local dev)
+    api_token: str = ""
+
     @property
     def source_list(self) -> list[str]:
         """Parsed, normalized list of enabled source connector names."""

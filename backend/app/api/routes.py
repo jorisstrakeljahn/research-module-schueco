@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Query
 from sqlmodel import Session, select
 
 from app.db import get_engine, get_session
@@ -40,6 +40,19 @@ from app.schemas import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def require_token(authorization: str | None = Header(default=None)) -> None:
+    """Shared-token gate for state-changing routes. No-op when API_TOKEN is unset
+    (local development); on non-local deployments set API_TOKEN to protect the
+    billable / data-mutating endpoints."""
+    from app.config import get_settings
+
+    token = get_settings().api_token
+    if not token:
+        return
+    if authorization != f"Bearer {token}":
+        raise HTTPException(status_code=401, detail="Invalid or missing token")
 
 
 def _run_pipeline_bg(
@@ -131,14 +144,14 @@ def list_runs(
     return session.exec(select(Run).order_by(Run.id.desc()).limit(limit)).all()
 
 
-@router.post("/runs", status_code=202)
+@router.post("/runs", status_code=202, dependencies=[Depends(require_token)])
 def start_run(body: RunRequest, background: BackgroundTasks) -> dict:
     """Kick off a real pipeline run from the UI (keyword search)."""
     keywords = [k.strip() for k in body.keywords if k.strip()]
     query = " ".join(keywords) or (body.query or "").strip()
     if not query:
         raise HTTPException(status_code=422, detail="keywords or query required")
-    mode = body.mode if body.mode in ("simple", "deep_research") else "deep_research"
+    mode = body.mode
     background.add_task(
         _run_pipeline_bg, keywords, query, body.limit, body.language, mode
     )
@@ -196,17 +209,17 @@ def get_trend(
     )
 
 
-@router.post("/trends/{trend_id}/feedback", response_model=FeedbackOut)
+@router.post(
+    "/trends/{trend_id}/feedback",
+    response_model=FeedbackOut,
+    dependencies=[Depends(require_token)],
+)
 def add_feedback(
     trend_id: int, body: FeedbackIn, session: Session = Depends(get_session)
 ) -> ExpertFeedback:
     trend = session.get(Trend, trend_id)
     if not trend:
         raise HTTPException(status_code=404, detail="Trend not found")
-    if body.action not in ("confirm", "correct", "reject"):
-        raise HTTPException(
-            status_code=422, detail="action must be confirm|correct|reject"
-        )
     # A maturity correction is the authoritative assessment: apply it to the trend so
     # it survives reload. The machine value is preserved in ExpertFeedback.old_value.
     if body.action == "correct" and body.field == "maturity":
@@ -228,7 +241,11 @@ def add_feedback(
     return feedback
 
 
-@router.post("/trends/{trend_id}/translate", response_model=TranslateOut)
+@router.post(
+    "/trends/{trend_id}/translate",
+    response_model=TranslateOut,
+    dependencies=[Depends(require_token)],
+)
 def translate_trend(
     trend_id: int, body: TranslateIn, session: Session = Depends(get_session)
 ) -> TranslateOut:
@@ -239,8 +256,6 @@ def translate_trend(
     trend = session.get(Trend, trend_id)
     if not trend:
         raise HTTPException(status_code=404, detail="Trend not found")
-    if body.language not in ("en", "de"):
-        raise HTTPException(status_code=422, detail="language must be en|de")
     assessment = session.exec(
         select(TrendAssessment).where(TrendAssessment.trend_id == trend.id)
     ).first()
@@ -269,7 +284,12 @@ def list_reference_trends(
     ).all()
 
 
-@router.post("/reference-trends", response_model=ReferenceTrendOut, status_code=201)
+@router.post(
+    "/reference-trends",
+    response_model=ReferenceTrendOut,
+    status_code=201,
+    dependencies=[Depends(require_token)],
+)
 def create_reference_trend(
     body: ReferenceTrendIn, session: Session = Depends(get_session)
 ) -> ReferenceTrend:
@@ -289,7 +309,11 @@ def create_reference_trend(
     return ref
 
 
-@router.delete("/reference-trends/{ref_id}", status_code=204)
+@router.delete(
+    "/reference-trends/{ref_id}",
+    status_code=204,
+    dependencies=[Depends(require_token)],
+)
 def delete_reference_trend(
     ref_id: int, session: Session = Depends(get_session)
 ) -> None:
