@@ -21,6 +21,7 @@ from dataclasses import dataclass, field
 from typing import Protocol
 
 from app.models import PESTEL_DIMENSIONS, TREND_CATEGORIES
+from app.pipeline.timeseries import growth_ratio
 
 # Lexicons for the offline, deterministic classifier. Deliberately small and
 # domain-tuned; the LLM classifier is the scientific default for nuance.
@@ -72,7 +73,6 @@ _CATEGORY_LEXICON: dict[str, set[str]] = {
     },
 }
 
-RADAR_STAGES = ("act", "prepare", "watch")
 _MATURITY_IMPACT = {
     "weak_signal": 3.0,
     "emerging": 5.5,
@@ -124,14 +124,15 @@ def radar_stage(impact: float, urgency: float) -> str:
 
 
 def _growth(timepoints: dict[str, int]) -> float:
-    """Recent-vs-older growth ratio of a topic's quarterly counts (>=0)."""
+    """Recent-vs-older growth ratio of a topic's quarterly counts, clamped at 0.
+
+    Wraps the shared :func:`app.pipeline.timeseries.growth_ratio`, preserving this
+    call site's two extra guarantees: 0.0 for fewer than two periods, and no
+    negative values (urgency must not be penalised by a shrinking topic here).
+    """
     if len(timepoints) < 2:
         return 0.0
-    periods = sorted(timepoints)
-    mid = len(periods) // 2
-    older = sum(timepoints[p] for p in periods[:mid]) or 1
-    recent = sum(timepoints[p] for p in periods[mid:])
-    return max(0.0, (recent - older) / older)
+    return max(0.0, growth_ratio(timepoints))
 
 
 class TrendClassifier(Protocol):

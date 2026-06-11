@@ -30,6 +30,19 @@ def build_topic_timepoints(
     return result
 
 
+def growth_ratio(timepoints: dict[str, int]) -> float:
+    """Signed recent-vs-older growth ratio of quarterly counts (split at the midpoint).
+
+    Shared with :mod:`app.pipeline.classify`, which clamps the result at 0 for its
+    urgency signal; the maturity heuristic uses the signed value directly.
+    """
+    periods = sorted(timepoints)
+    mid = len(periods) // 2
+    older = sum(timepoints[p] for p in periods[:mid]) or 1
+    recent = sum(timepoints[p] for p in periods[mid:])
+    return (recent - older) / older
+
+
 def classify_maturity(
     timepoints: dict[str, int],
     *,
@@ -56,12 +69,8 @@ def classify_maturity(
     if total <= weak_max:
         level = "weak_signal"
     else:
-        periods = sorted(timepoints)
-        span = len(periods)
-        mid = span // 2
-        older = sum(timepoints[p] for p in periods[:mid]) or 1
-        recent = sum(timepoints[p] for p in periods[mid:])
-        growth = (recent - older) / older
+        span = len(timepoints)
+        growth = growth_ratio(timepoints)
 
         # Megatrend = sustained volume across a long span. ``total`` counts dated
         # documents only, so the long-span gate (not raw volume) is the decisive
