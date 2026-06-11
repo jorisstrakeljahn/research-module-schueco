@@ -6,12 +6,11 @@ import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
+import Score from "@/components/Score";
+import TrendBadges from "@/components/TrendBadges";
 import {
-  CATEGORY_META,
   fetchTrend,
-  MATURITY_META,
   PESTEL_SECTORS,
-  RADAR_STAGE_META,
   sendFeedback,
   translateTrend,
   type Maturity,
@@ -56,9 +55,6 @@ export default function TrendDetailPage() {
   if (error) return <div className="p-8 text-sm text-digital">{error}</div>;
   if (!trend) return <div className="p-8 text-sm text-muted">{t("detail.loading")}</div>;
 
-  const cat = trend.category ? CATEGORY_META[trend.category] : null;
-  const stage = trend.radar_stage ? RADAR_STAGE_META[trend.radar_stage] : null;
-  const maturity = trend.maturity ? (trend.maturity as Maturity) : null;
   const title = override?.title ?? trend.title;
   const summary = override?.summary ?? trend.summary;
   const rationale = override ? override.rationale : trend.rationale;
@@ -88,29 +84,7 @@ export default function TrendDetailPage() {
 
       <div className="flex-1 overflow-auto">
         <article className="mx-auto max-w-3xl p-6">
-          <div className="flex flex-wrap items-center gap-2 text-xs">
-        {stage && (
-          <span className="rounded-full bg-fg px-2.5 py-0.5 font-medium text-bg">
-            {stage.label}
-          </span>
-        )}
-        {cat && (
-          <span
-            className="rounded-full px-2.5 py-0.5 font-medium text-white"
-            style={{ backgroundColor: cat.color }}
-          >
-            {cat.label}
-          </span>
-        )}
-        {maturity && (
-          <span
-            className="rounded-full px-2.5 py-0.5 font-medium text-white"
-            style={{ backgroundColor: MATURITY_META[maturity].color }}
-          >
-            {t(`maturity.${maturity}`)}
-          </span>
-        )}
-      </div>
+          <TrendBadges trend={trend} />
 
       <h1 className="mt-3 text-2xl font-semibold tracking-tight text-fg">
         {title}
@@ -206,24 +180,6 @@ function Section({
       </h2>
       {children}
     </section>
-  );
-}
-
-function Score({ label, value }: { label: string; value: number | null }) {
-  const v = value ?? 0;
-  return (
-    <div>
-      <div className="flex items-baseline justify-between text-[12px] text-muted">
-        <span>{label}</span>
-        <span className="font-mono text-fg">{value != null ? value.toFixed(1) : "n/a"}</span>
-      </div>
-      <div className="mt-1 h-1.5 w-full rounded-full bg-surface-2">
-        <div
-          className="h-1.5 rounded-full bg-primary"
-          style={{ width: `${(v / 10) * 100}%` }}
-        />
-      </div>
-    </div>
   );
 }
 
