@@ -12,14 +12,7 @@ from __future__ import annotations
 
 import numpy as np
 
-
-def _l2_normalize(matrix: np.ndarray) -> np.ndarray:
-    matrix = np.asarray(matrix, dtype=np.float32)
-    if matrix.ndim == 1:
-        matrix = matrix.reshape(1, -1)
-    norms = np.linalg.norm(matrix, axis=1, keepdims=True)
-    norms[norms == 0] = 1.0
-    return matrix / norms
+from app.pipeline.mathutil import l2_normalize as _l2_normalize
 
 
 def compute_emergence(
