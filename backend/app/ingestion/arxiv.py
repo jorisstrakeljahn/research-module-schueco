@@ -9,24 +9,13 @@ signal source in the multi-source strategy (ADR-20).
 from __future__ import annotations
 
 import xml.etree.ElementTree as ET
-from datetime import datetime
 
 import httpx
 
-from app.ingestion.base import RawDocument
+from app.ingestion.base import RawDocument, parse_date
 
 ARXIV_API_URL = "https://export.arxiv.org/api/query"
 _ATOM = {"a": "http://www.w3.org/2005/Atom"}
-
-
-def _parse_date(value: str | None) -> datetime | None:
-    if not value:
-        return None
-    try:
-        # arXiv timestamps look like "2023-05-01T12:00:00Z".
-        return datetime.fromisoformat(value.replace("Z", "+00:00"))
-    except ValueError:
-        return None
 
 
 def parse_atom(xml_text: str) -> list[RawDocument]:
@@ -49,7 +38,7 @@ def parse_atom(xml_text: str) -> list[RawDocument]:
                 title=title,
                 text=text,
                 url=url or None,
-                published_at=_parse_date(published),
+                published_at=parse_date(published),
                 language="en",
                 source_name="arXiv",
                 source_type="preprint",

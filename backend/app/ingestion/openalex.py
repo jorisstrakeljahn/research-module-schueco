@@ -8,12 +8,11 @@ Abstracts are delivered as an inverted index and reconstructed here.
 from __future__ import annotations
 
 from collections import Counter
-from datetime import UTC, datetime
 
 import httpx
 
 from app.config import get_settings
-from app.ingestion.base import RawDocument
+from app.ingestion.base import RawDocument, parse_date
 from app.ingestion.geo import region_for_country
 
 OPENALEX_WORKS_URL = "https://api.openalex.org/works"
@@ -44,15 +43,6 @@ def reconstruct_abstract(inverted_index: dict[str, list[int]] | None) -> str:
     return " ".join(word for _, word in positions)
 
 
-def _parse_date(value: str | None) -> datetime | None:
-    if not value:
-        return None
-    try:
-        return datetime.strptime(value, "%Y-%m-%d").replace(tzinfo=UTC)
-    except ValueError:
-        return None
-
-
 def work_to_document(work: dict) -> RawDocument:
     """Map a single OpenAlex work object to a :class:`RawDocument`."""
     title = work.get("title") or work.get("display_name") or "(untitled)"
@@ -64,7 +54,7 @@ def work_to_document(work: dict) -> RawDocument:
         title=title,
         text=text,
         url=work.get("id"),
-        published_at=_parse_date(work.get("publication_date")),
+        published_at=parse_date(work.get("publication_date")),
         language=work.get("language"),
         country=country,
         region=region_for_country(country),

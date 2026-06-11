@@ -11,22 +11,11 @@ response-shape changes; if no API key is configured it is skipped by the registr
 
 from __future__ import annotations
 
-from datetime import datetime
-
 import httpx
 
-from app.ingestion.base import RawDocument
+from app.ingestion.base import RawDocument, parse_date
 
 FIRECRAWL_SEARCH_URL = "https://api.firecrawl.dev/v1/search"
-
-
-def _parse_date(value: str | None) -> datetime | None:
-    if not value:
-        return None
-    try:
-        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
-    except ValueError:
-        return None
 
 
 def _result_to_document(item: dict, source_type: str) -> RawDocument | None:
@@ -54,7 +43,7 @@ def _result_to_document(item: dict, source_type: str) -> RawDocument | None:
         title=title,
         text=text[:4000],
         url=url,
-        published_at=_parse_date(published),
+        published_at=parse_date(published),
         language=metadata.get("language"),
         source_name="Firecrawl",
         source_type=source_type,
