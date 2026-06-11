@@ -11,6 +11,7 @@ from sqlmodel import Session, select
 from app.db import get_engine, get_session
 from app.evaluation import TrendLike, compute_overlap
 from app.models import (
+    MATURITY_LEVELS,
     ExpertFeedback,
     ReferenceTrend,
     Run,
@@ -199,12 +200,20 @@ def get_trend(
 def add_feedback(
     trend_id: int, body: FeedbackIn, session: Session = Depends(get_session)
 ) -> ExpertFeedback:
-    if not session.get(Trend, trend_id):
+    trend = session.get(Trend, trend_id)
+    if not trend:
         raise HTTPException(status_code=404, detail="Trend not found")
     if body.action not in ("confirm", "correct", "reject"):
         raise HTTPException(
             status_code=422, detail="action must be confirm|correct|reject"
         )
+    # A maturity correction is the authoritative assessment: apply it to the trend so
+    # it survives reload. The machine value is preserved in ExpertFeedback.old_value.
+    if body.action == "correct" and body.field == "maturity":
+        if body.new_value not in MATURITY_LEVELS:
+            raise HTTPException(status_code=422, detail="invalid maturity value")
+        trend.maturity = body.new_value
+        session.add(trend)
     feedback = ExpertFeedback(
         trend_id=trend_id,
         action=body.action,

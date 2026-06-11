@@ -123,8 +123,18 @@ def run_deep_research(
     excludes = negative_terms_from_feedback(session) if use_feedback else []
     merged = merge_seeds(base_seeds, fb_seeds)
 
+    # Expert rejections only take effect through an active relevance gate. With the
+    # default RELEVANCE=off (PassthroughRelevance) they would be silently ignored, so
+    # escalate to the keyword gate whenever there are exclusion terms to honor.
+    relevance_name = settings.relevance
+    if relevance_name == "off" and excludes:
+        relevance_name = "keyword"
+        logger.info(
+            "Escalating relevance gate to 'keyword' to honor %d rejection term(s)",
+            len(excludes),
+        )
     relevance = get_relevance(
-        settings.relevance,
+        relevance_name,
         domain=settings.research_domain,
         include_terms=merged,
         exclude_terms=excludes,

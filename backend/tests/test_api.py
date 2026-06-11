@@ -179,3 +179,34 @@ def test_feedback(client, session):
 
     missing = client.get("/trends/999999")
     assert missing.status_code == 404
+
+
+@requires_db
+def test_maturity_correction_persists(client, session):
+    trend = _seed(session)  # seeded as "emerging"
+    resp = client.post(
+        f"/trends/{trend.id}/feedback",
+        json={
+            "action": "correct",
+            "field": "maturity",
+            "old_value": "emerging",
+            "new_value": "established",
+        },
+    )
+    assert resp.status_code == 200
+
+    match = next(t for t in client.get("/trends").json() if t["id"] == trend.id)
+    assert match["maturity"] == "established"
+
+
+@requires_db
+def test_invalid_maturity_correction_is_422(client, session):
+    trend = _seed(session)
+    resp = client.post(
+        f"/trends/{trend.id}/feedback",
+        json={"action": "correct", "field": "maturity", "new_value": "nonsense"},
+    )
+    assert resp.status_code == 422
+
+    match = next(t for t in client.get("/trends").json() if t["id"] == trend.id)
+    assert match["maturity"] == "emerging"

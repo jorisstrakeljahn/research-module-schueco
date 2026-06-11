@@ -222,7 +222,7 @@ class ExpertFeedback(SQLModel, table=True):
 
     id: int | None = Field(default=None, primary_key=True)
     trend_id: int = Field(foreign_key="trend.id", index=True)
-    action: str  # confirm | correct
+    action: str  # confirm | correct | reject
     field: str | None = None
     old_value: str | None = None
     new_value: str | None = None
