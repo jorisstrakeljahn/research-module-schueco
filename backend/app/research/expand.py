@@ -9,7 +9,10 @@ which is the mechanism by which the system "goes deeper" over rounds. The offlin
 from __future__ import annotations
 
 import json
+import logging
 from typing import Protocol
+
+logger = logging.getLogger(__name__)
 
 
 class QueryExpander(Protocol):
@@ -68,15 +71,17 @@ class LLMQueryExpander:
             "surface adjacent or emerging sub-topics in this domain. Stay on-topic.\n"
             'Respond as JSON: {"queries": ["...", "..."]}'
         )
-        resp = self._client.chat.completions.create(
-            model=self._model_name,
-            messages=[{"role": "user", "content": prompt}],
-            response_format={"type": "json_object"},
-        )
         try:
+            resp = self._client.chat.completions.create(
+                model=self._model_name,
+                messages=[{"role": "user", "content": prompt}],
+                response_format={"type": "json_object"},
+            )
             data = json.loads(resp.choices[0].message.content)
             queries = data.get("queries", [])
-        except (json.JSONDecodeError, AttributeError):
+        except Exception:
+            # Fail open: an API error must not abort the crawl - just skip expansion.
+            logger.warning("LLM query expansion failed; no expansion", exc_info=True)
             return []
         used_low = {u.lower() for u in already_used}
         return [

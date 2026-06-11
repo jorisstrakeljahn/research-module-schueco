@@ -17,6 +17,7 @@ class RunOut(BaseModel):
     embedder: str | None
     topic_model: str | None
     describer: str | None
+    error: str | None = None
 
 
 class TimepointOut(BaseModel):

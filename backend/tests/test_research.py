@@ -5,14 +5,27 @@ from __future__ import annotations
 from app.ingestion.base import RawDocument
 from app.models import ExpertFeedback, Run, Topic, Trend
 from app.research.crawler import DeepResearchCrawler
-from app.research.expand import NoopExpander
+from app.research.expand import LLMQueryExpander, NoopExpander
 from app.research.feedback import (
     negative_terms_from_feedback,
     seeds_from_feedback,
 )
-from app.research.relevance import KeywordRelevance, PassthroughRelevance
+from app.research.relevance import KeywordRelevance, LLMRelevance, PassthroughRelevance
 from app.research.seeds import merge_seeds
 from tests.conftest import requires_db
+
+
+def _raising_client() -> object:
+    """An OpenAI client stand-in whose completion call always fails."""
+
+    def boom(**_: object) -> object:
+        raise RuntimeError("api down")
+
+    from types import SimpleNamespace
+
+    return SimpleNamespace(
+        chat=SimpleNamespace(completions=SimpleNamespace(create=boom))
+    )
 
 
 def _doc(i: int, title: str, source: str = "Fake") -> RawDocument:
@@ -78,6 +91,28 @@ def test_keyword_relevance_excludes() -> None:
 
 def test_noop_expander_returns_nothing() -> None:
     assert NoopExpander().expand("d", ["s"], ["t"], ["u"]) == []
+
+
+def test_llm_relevance_fails_open_on_api_error() -> None:
+    """A dead OpenAI API must not lose documents: the gate degrades to passthrough."""
+    rel = LLMRelevance.__new__(LLMRelevance)
+    rel._client = _raising_client()
+    rel._domain = "facades"
+    rel._exclude = []
+    rel._model_name = "stub"
+    rel._batch_size = 20
+
+    docs = [_doc(1, "facade a"), _doc(2, "facade b")]
+    assert rel.keep(docs) == docs
+
+
+def test_llm_query_expander_fails_open_on_api_error() -> None:
+    """A dead OpenAI API must not abort the crawl: expansion degrades to none."""
+    exp = LLMQueryExpander.__new__(LLMQueryExpander)
+    exp._client = _raising_client()
+    exp._model_name = "stub"
+
+    assert exp.expand("facades", ["facade"], ["title"], ["facade"]) == []
 
 
 def test_crawler_single_round_dedupes_and_passes_through() -> None:

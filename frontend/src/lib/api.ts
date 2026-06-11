@@ -49,6 +49,7 @@ export interface Run {
   embedder: string | null;
   topic_model: string | null;
   describer: string | null;
+  error: string | null;
 }
 
 async function getJSON<T>(path: string): Promise<T> {
@@ -66,8 +67,8 @@ export function fetchTrend(id: number): Promise<TrendDetail> {
   return getJSON<TrendDetail>(`/trends/${id}`);
 }
 
-export function fetchRuns(): Promise<Run[]> {
-  return getJSON<Run[]>(`/runs`);
+export function fetchRuns(limit = 20): Promise<Run[]> {
+  return getJSON<Run[]>(`/runs?limit=${limit}`);
 }
 
 export type RunMode = "deep_research" | "simple";

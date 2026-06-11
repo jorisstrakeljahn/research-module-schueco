@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import logging
+from datetime import UTC, datetime
+
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlmodel import Session, select
 
@@ -33,6 +36,8 @@ from app.schemas import (
     TrendOut,
 )
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter()
 
 
@@ -51,17 +56,33 @@ def _run_pipeline_bg(
     from app.research.service import run_deep_research, run_simple_search
 
     with Session(get_engine()) as session:
-        if mode == "simple":
-            run_simple_search(
-                query, session=session, language=language, limit=limit
+        try:
+            if mode == "simple":
+                run_simple_search(
+                    query, session=session, language=language, limit=limit
+                )
+            else:
+                run_deep_research(
+                    session=session,
+                    seeds=keywords or [query],
+                    focus_query=query,
+                    language=language,
+                )
+        except Exception as exc:
+            # For deep research the Run row is created only after the crawl, so a
+            # pre-Run crawl failure would otherwise leave no trace to poll. Persist a
+            # terminal failed Run so every background invocation is observable.
+            logger.exception("background run failed")
+            session.rollback()
+            session.add(
+                Run(
+                    status="failed",
+                    finished_at=datetime.now(UTC),
+                    error=f"{type(exc).__name__}: {exc}"[:500],
+                    params={"query": query, "mode": mode},
+                )
             )
-        else:
-            run_deep_research(
-                session=session,
-                seeds=keywords or [query],
-                focus_query=query,
-                language=language,
-            )
+            session.commit()
 
 
 def _latest_completed_run_id(session: Session) -> int | None:
@@ -102,8 +123,11 @@ def health() -> dict:
 
 
 @router.get("/runs", response_model=list[RunOut])
-def list_runs(session: Session = Depends(get_session)) -> list[Run]:
-    return session.exec(select(Run).order_by(Run.id.desc())).all()
+def list_runs(
+    session: Session = Depends(get_session),
+    limit: int = Query(default=20, ge=1, le=200),
+) -> list[Run]:
+    return session.exec(select(Run).order_by(Run.id.desc()).limit(limit)).all()
 
 
 @router.post("/runs", status_code=202)

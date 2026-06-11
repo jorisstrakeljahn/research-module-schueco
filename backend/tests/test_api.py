@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlmodel import select
 
 from app.main import app
 from app.models import Run, Topic, TopicTimepoint, Trend, TrendAssessment
@@ -131,6 +132,36 @@ def test_translate_trend(client, session):
     assert client.post(
         "/trends/999999/translate", json={"language": "de"}
     ).status_code == 404
+
+
+@requires_db
+def test_list_runs_respects_limit(client, session):
+    for _ in range(2):
+        session.add(Run(status="completed"))
+    session.commit()
+
+    runs = client.get("/runs", params={"limit": 1}).json()
+    assert len(runs) == 1
+    # newest first
+    all_runs = client.get("/runs").json()
+    assert runs[0]["id"] == max(r["id"] for r in all_runs)
+
+
+@requires_db
+def test_background_failure_leaves_failed_run(session, monkeypatch):
+    from app.api.routes import _run_pipeline_bg
+
+    def boom(*_a, **_k):
+        raise RuntimeError("crawl exploded")
+
+    monkeypatch.setattr("app.research.service.run_simple_search", boom)
+
+    _run_pipeline_bg([], "facade", 10, "en", "simple")
+
+    runs = session.exec(select(Run).order_by(Run.id.desc())).all()
+    assert runs, "the background task must leave a terminal Run row"
+    assert runs[0].status == "failed"
+    assert runs[0].error
 
 
 @requires_db

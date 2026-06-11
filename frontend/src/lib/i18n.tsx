@@ -92,6 +92,9 @@ const messages: Record<Lang, Dict> = {
     "search.toastErrorTitle": "Lauf konnte nicht gestartet werden",
     "search.toastDoneTitle": "Neue Trends verfügbar",
     "search.toastDoneDesc": "{topics} Themen aus {docs} Dokumenten",
+    "search.toastFailedTitle": "Analyse-Lauf fehlgeschlagen",
+    "search.toastTimeout":
+      "Der Lauf dauert länger als erwartet – er läuft im Hintergrund weiter.",
 
     "newsfeed.title": "Newsfeed",
     "newsfeed.subtitle":
@@ -209,6 +212,9 @@ const messages: Record<Lang, Dict> = {
     "search.toastErrorTitle": "Could not start run",
     "search.toastDoneTitle": "New trends available",
     "search.toastDoneDesc": "{topics} topics from {docs} documents",
+    "search.toastFailedTitle": "Analysis run failed",
+    "search.toastTimeout":
+      "The run is taking longer than expected — it continues in the background.",
 
     "newsfeed.title": "Newsfeed",
     "newsfeed.subtitle":

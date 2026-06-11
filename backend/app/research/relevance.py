@@ -10,10 +10,13 @@ judgement (batched to stay cheap).
 from __future__ import annotations
 
 import json
+import logging
 import re
 from typing import Protocol
 
 from app.ingestion.base import RawDocument
+
+logger = logging.getLogger(__name__)
 
 _WORD = re.compile(r"[a-z]{4,}")
 
@@ -101,16 +104,19 @@ class LLMRelevance:
             f"unrelated ones.\n{listing}\n\n"
             'Respond as JSON: {"relevant": [0, 2, ...]}'
         )
-        resp = self._client.chat.completions.create(
-            model=self._model_name,
-            messages=[{"role": "user", "content": prompt}],
-            response_format={"type": "json_object"},
-        )
         try:
+            resp = self._client.chat.completions.create(
+                model=self._model_name,
+                messages=[{"role": "user", "content": prompt}],
+                response_format={"type": "json_object"},
+            )
             data = json.loads(resp.choices[0].message.content)
             idxs = {int(i) for i in data.get("relevant", [])}
-        except (json.JSONDecodeError, AttributeError, ValueError, TypeError):
-            return docs  # fail open: do not lose data on a parse error
+        except Exception:
+            # Fail open: a dead/erroring API or an unparseable response must never
+            # abort the crawl or silently drop documents - degrade to passthrough.
+            logger.warning("LLM relevance gate failed; keeping batch", exc_info=True)
+            return docs
         return [d for i, d in enumerate(docs) if i in idxs]
 
     def keep(self, docs: list[RawDocument]) -> list[RawDocument]:

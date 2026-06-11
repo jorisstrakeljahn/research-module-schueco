@@ -27,7 +27,7 @@ export default function DashboardPage() {
 
   function reload() {
     fetchTrends().then(setTrends).catch((e) => setError(String(e)));
-    fetchRuns().then((r) => setRun(r[0] ?? null));
+    fetchRuns().then((r) => setRun(r[0] ?? null)).catch(() => setRun(null));
   }
 
   useEffect(() => {
@@ -43,14 +43,21 @@ export default function DashboardPage() {
     };
   }, []);
 
-  function handleStarted(query: string) {
+  async function handleStarted(query: string) {
     if (query.startsWith("__error__:")) {
       toast.error(t("search.toastErrorTitle"), {
         description: query.replace("__error__:", ""),
       });
       return;
     }
-    const baselineId = run?.id ?? 0;
+    // Fetch the baseline fresh at click time so an early click (before the initial
+    // fetchRuns resolves) cannot mistake an old completed run for a new result.
+    let baselineId = run?.id ?? 0;
+    try {
+      baselineId = (await fetchRuns(1))[0]?.id ?? 0;
+    } catch {
+      /* fall back to the possibly-stale state id */
+    }
     toast.success(t("search.toastStartTitle"), {
       description: t("search.toastStartDesc", { query }),
     });
@@ -59,7 +66,7 @@ export default function DashboardPage() {
     pollRef.current = setInterval(async () => {
       tries += 1;
       try {
-        const runs = await fetchRuns();
+        const runs = await fetchRuns(1);
         const latest = runs[0];
         if (latest && latest.id > baselineId && latest.status === "completed") {
           if (pollRef.current) clearInterval(pollRef.current);
@@ -70,11 +77,22 @@ export default function DashboardPage() {
               docs: latest.n_documents,
             }),
           });
+          return;
+        }
+        if (latest && latest.id > baselineId && latest.status === "failed") {
+          if (pollRef.current) clearInterval(pollRef.current);
+          toast.error(t("search.toastFailedTitle"), {
+            description: latest.error ?? "",
+          });
+          return;
         }
       } catch {
         /* keep polling */
       }
-      if (tries >= 45 && pollRef.current) clearInterval(pollRef.current);
+      if (tries >= 90 && pollRef.current) {
+        clearInterval(pollRef.current);
+        toast.info(t("search.toastTimeout"));
+      }
     }, 4000);
   }
 
