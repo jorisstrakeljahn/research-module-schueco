@@ -23,28 +23,42 @@ sources ─▶ ingest ─▶ embed ─▶ topics ─▶ time series ─▶ descr
 - [uv](https://docs.astral.sh/uv/) (Python 3.11–3.13)
 - Node.js 20+
 
-## Quickstart
+## Quickstart (demo UI)
+
+Load the committed demo snapshot first — no API keys and no pipeline run needed:
 
 ```bash
 # 1. Database
 docker compose up -d db
 
-# 2. Backend (offline defaults — no API key needed)
+# 2. Backend
 cd backend
 uv sync
 cp .env.example .env
-
-uv run trendscout run "building facade adaptive" --limit 40   # one simple run
-uv run trendscout research                                    # bounded deep-research crawl
-uv run trendscout serve                                       # API on :8000
+uv run trendscout seed-demo   # loads data/demo.sql (~50 trends)
+uv run trendscout serve       # API on :8000
 
 # 3. Frontend (second terminal)
 cd frontend
 npm install
-npm run dev                                                   # UI on :3000
+npm run dev                   # UI on :3000
 ```
 
-Open http://localhost:3000.
+Open http://localhost:3000 — Dashboard, Newsfeed and Trendradar show the demo trends
+from the latest completed run.
+
+To regenerate your own data instead, skip `seed-demo` and run the pipeline:
+
+```bash
+uv run trendscout run "building facade adaptive" --limit 40   # one simple run
+uv run trendscout research                                    # bounded deep-research crawl
+```
+
+Maintainers can refresh the snapshot after a good pipeline run:
+
+```bash
+./scripts/export-demo.sh
+```
 
 ## Tests
 
@@ -73,4 +87,6 @@ uv sync --extra ml --extra llm
 ```
 backend/   FastAPI app, ingestion connectors, analysis pipeline, CLI (uv)
 frontend/  Next.js + Tailwind UI (Trendradar, dashboard, expert review)
+data/      demo.sql snapshot loaded by `trendscout seed-demo`
+scripts/   export-demo.sh to refresh the snapshot (maintainers)
 ```

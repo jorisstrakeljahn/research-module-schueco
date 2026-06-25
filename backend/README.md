@@ -34,6 +34,7 @@ Select via `.env` (`EMBEDDER`, `TOPIC_MODEL`, `DESCRIBER`, `EMBEDDING_DIM`).
 
 ```bash
 uv run trendscout init-db
+uv run trendscout seed-demo              # load data/demo.sql into local Postgres
 uv run trendscout run "circular construction facade" --limit 40
 uv run trendscout research                 # bounded deep-research crawl (all sources)
 uv run trendscout serve --reload

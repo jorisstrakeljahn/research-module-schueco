@@ -25,6 +25,15 @@ def init_db_command() -> None:
     typer.echo("Database initialized.")
 
 
+@app.command("seed-demo")
+def seed_demo_command() -> None:
+    """Load the committed demo snapshot (``data/demo.sql``) into the local database."""
+    from app.demo_seed import seed_demo_database
+
+    seed_demo_database()
+    typer.echo("Demo dataset loaded.")
+
+
 @app.command("run")
 def run_command(
     query: str = typer.Argument(..., help="Search query for the domain, e.g. 'facade'"),
