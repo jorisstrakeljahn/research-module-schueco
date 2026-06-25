@@ -19,9 +19,45 @@ sources ─▶ ingest ─▶ embed ─▶ topics ─▶ time series ─▶ descr
 
 ## Prerequisites
 
-- Docker (PostgreSQL + pgvector)
-- [uv](https://docs.astral.sh/uv/) (Python 3.11–3.13)
-- Node.js 20+
+Install these **before** the Quickstart (each is a hard requirement):
+
+| Tool | Purpose | Check |
+|------|---------|-------|
+| **Docker Desktop** | PostgreSQL + pgvector (in container) | `docker info` |
+| **[uv](https://docs.astral.sh/uv/)** | Python deps + backend CLI | `uv --version` |
+| **Node.js 20+** | Frontend | `node --version` |
+
+### Install uv (one-time)
+
+[uv](https://docs.astral.sh/uv/) is the Python package manager for the backend. It also
+downloads a compatible Python automatically — no separate Python install needed.
+
+**macOS / Linux:**
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+Then restart the terminal (or run `source $HOME/.local/bin/env`).
+
+**Windows (PowerShell):**
+
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
+**Alternative:** `brew install uv` (macOS) or `pip install uv`.
+
+Verify: `uv --version` — then continue with Quickstart below.
+
+### Install Docker Desktop (one-time)
+
+Download [Docker Desktop](https://www.docker.com/products/docker-desktop/), install,
+start it and wait until the engine is running. pgvector is **not** installed separately —
+it ships inside the `pgvector/pgvector:pg16` image from `docker compose up -d db`.
+
+If the pull fails with `500 Internal Server Error`, restart Docker Desktop and run
+`docker pull pgvector/pgvector:pg16` before `docker compose up -d db`.
 
 ## Quickstart (demo UI)
 
@@ -59,6 +95,27 @@ Maintainers can refresh the snapshot after a good pipeline run:
 ```bash
 ./scripts/export-demo.sh
 ```
+
+### Troubleshooting
+
+**`expected 384 dimensions, not 1536` (or the reverse) during `seed-demo`**
+
+The local Postgres volume was created with a different `EMBEDDING_DIM` than your
+current `.env`. Reset the DB volume and import again (fresh clone path):
+
+```bash
+docker compose down -v
+docker compose up -d db
+cd backend && uv run trendscout seed-demo
+```
+
+Keep `EMBEDDING_DIM=384` from `.env.example` — the committed demo snapshot ships
+without embedding vectors (UI data only).
+
+**`uv: command not found`**
+
+Install uv first (see [Install uv](#install-uv-one-time) above), restart the terminal,
+then continue from `cd backend`.
 
 ## Tests
 

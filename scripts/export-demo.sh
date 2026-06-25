@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Refresh data/demo.sql from the local Docker Postgres (maintainers only).
+# Refresh data/demo.sql from local Docker Postgres (maintainers only).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -10,12 +10,5 @@ if ! docker inspect -f '{{.State.Running}}' trendscout-db 2>/dev/null | grep -qx
   exit 1
 fi
 
-docker exec trendscout-db pg_dump \
-  -U trendscout \
-  -d trendscout \
-  --data-only \
-  --no-owner \
-  --no-privileges \
-  > "$ROOT/data/demo.sql"
-
-echo "Wrote $ROOT/data/demo.sql ($(wc -c < "$ROOT/data/demo.sql") bytes)"
+python3 "$ROOT/scripts/build_demo_sql.py"
+echo "Demo snapshot ready for commit (vectors stripped — works with EMBEDDING_DIM=384)."

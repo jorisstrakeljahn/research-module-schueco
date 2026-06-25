@@ -81,6 +81,13 @@ def _import_sql_file(sql_path: Path) -> None:
         )
         if proc.returncode != 0:
             detail = proc.stderr.decode() or proc.stdout.decode()
+            if "dimensions" in detail:
+                detail += (
+                    "\n\nHint: reset the local DB volume and retry:\n"
+                    "  docker compose down -v && docker compose up -d db\n"
+                    "  cd backend && uv run trendscout seed-demo\n"
+                    "Keep EMBEDDING_DIM=384 from .env.example for the demo snapshot."
+                )
             raise RuntimeError(f"Demo import via Docker failed:\n{detail}")
         return
 
