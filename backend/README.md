@@ -3,6 +3,12 @@
 FastAPI + SQLModel + PostgreSQL/pgvector. Python pipeline:
 ingest → embed → topic model → time series → describe → persist.
 
+## Prerequisites
+
+- Docker (see root `README.md` — Postgres + pgvector run in a container)
+- [uv](https://docs.astral.sh/uv/) — install once: `curl -LsSf https://astral.sh/uv/install.sh | sh`
+- Root repo cloned; run backend commands from this directory
+
 ## Layout
 
 ```

@@ -1,0 +1,863 @@
+{
+  "run": {
+    "id": 7,
+    "embedder": "openai",
+    "topic_model": "simple",
+    "describer": "openai",
+    "n_documents": 280,
+    "n_topics": 18
+  },
+  "n_trends": 18,
+  "trends": [
+    {
+      "trend_id": 34,
+      "topic_id": 34,
+      "title": "Adaptive Reuse Enhances Climate Resilience in Buildings",
+      "maturity": "established",
+      "emergence": 0.07562237977981567,
+      "size": 28,
+      "label": "reuse, buildings, adaptive",
+      "pestel": "[\"environmental\", \"social\"]",
+      "category": "climate",
+      "impact": 8.4,
+      "uncertainty": 4.1134335696697235,
+      "urgency": 6.075622379779816,
+      "radar_stage": "act",
+      "timepoints": [
+        {
+          "period": "2004-Q3",
+          "doc_count": 1
+        },
+        {
+          "period": "2011-Q1",
+          "doc_count": 1
+        },
+        {
+          "period": "2011-Q3",
+          "doc_count": 1
+        },
+        {
+          "period": "2016-Q2",
+          "doc_count": 1
+        },
+        {
+          "period": "2016-Q3",
+          "doc_count": 1
+        },
+        {
+          "period": "2017-Q4",
+          "doc_count": 1
+        },
+        {
+          "period": "2019-Q1",
+          "doc_count": 1
+        },
+        {
+          "period": "2023-Q2",
+          "doc_count": 1
+        },
+        {
+          "period": "2024-Q3",
+          "doc_count": 1
+        }
+      ]
+    },
+    {
+      "trend_id": 48,
+      "topic_id": 48,
+      "title": "Innovative Building Envelopes Enhance Energy Efficiency",
+      "maturity": "established",
+      "emergence": 0.05273926258087158,
+      "size": 28,
+      "label": "envelopes, performance, skin",
+      "pestel": "[\"technological\", \"environmental\"]",
+      "category": "technology",
+      "impact": 8.4,
+      "uncertainty": 4.079108893871307,
+      "urgency": 5.952739262580872,
+      "radar_stage": "prepare",
+      "timepoints": [
+        {
+          "period": "2001-Q2",
+          "doc_count": 1
+        },
+        {
+          "period": "2006-Q3",
+          "doc_count": 1
+        },
+        {
+          "period": "2013-Q2",
+          "doc_count": 1
+        },
+        {
+          "period": "2014-Q1",
+          "doc_count": 1
+        },
+        {
+          "period": "2016-Q1",
+          "doc_count": 1
+        },
+        {
+          "period": "2017-Q4",
+          "doc_count": 1
+        },
+        {
+          "period": "2019-Q1",
+          "doc_count": 1
+        },
+        {
+          "period": "2021-Q1",
+          "doc_count": 1
+        },
+        {
+          "period": "2023-Q3",
+          "doc_count": 1
+        },
+        {
+          "period": "2023-Q4",
+          "doc_count": 1
+        },
+        {
+          "period": "2025-Q1",
+          "doc_count": 1
+        }
+      ]
+    },
+    {
+      "trend_id": 49,
+      "topic_id": 49,
+      "title": "Accelerating Decarbonization in Global Building Sector",
+      "maturity": "megatrend",
+      "emergence": 0.028153717517852783,
+      "size": 22,
+      "label": "carbon, decarbonization, emissions",
+      "pestel": "[\"environmental\"]",
+      "category": "climate",
+      "impact": 8.399999999999999,
+      "uncertainty": 4.042230576276779,
+      "urgency": 7.028153717517853,
+      "radar_stage": "act",
+      "timepoints": [
+        {
+          "period": "2012-Q3",
+          "doc_count": 1
+        },
+        {
+          "period": "2016-Q4",
+          "doc_count": 1
+        },
+        {
+          "period": "2021-Q2",
+          "doc_count": 1
+        },
+        {
+          "period": "2022-Q2",
+          "doc_count": 2
+        },
+        {
+          "period": "2022-Q3",
+          "doc_count": 1
+        },
+        {
+          "period": "2023-Q2",
+          "doc_count": 3
+        },
+        {
+          "period": "2024-Q1",
+          "doc_count": 2
+        },
+        {
+          "period": "2024-Q2",
+          "doc_count": 2
+        },
+        {
+          "period": "2024-Q3",
+          "doc_count": 1
+        },
+        {
+          "period": "2025-Q1",
+          "doc_count": 1
+        }
+      ]
+    },
+    {
+      "trend_id": 43,
+      "topic_id": 43,
+      "title": "Smart Buildings Optimize Energy Consumption Using Data",
+      "maturity": "megatrend",
+      "emergence": 0.0821642279624939,
+      "size": 19,
+      "label": "energy, heat, data",
+      "pestel": "[\"technological\", \"environmental\"]",
+      "category": "technology",
+      "impact": 8.36,
+      "uncertainty": 4.623246341943741,
+      "urgency": 5.804386450184716,
+      "radar_stage": "prepare",
+      "timepoints": [
+        {
+          "period": "2002-Q4",
+          "doc_count": 1
+        },
+        {
+          "period": "2007-Q1",
+          "doc_count": 1
+        },
+        {
+          "period": "2016-Q1",
+          "doc_count": 1
+        },
+        {
+          "period": "2018-Q2",
+          "doc_count": 2
+        },
+        {
+          "period": "2018-Q3",
+          "doc_count": 1
+        },
+        {
+          "period": "2018-Q4",
+          "doc_count": 1
+        },
+        {
+          "period": "2019-Q1",
+          "doc_count": 1
+        },
+        {
+          "period": "2020-Q3",
+          "doc_count": 1
+        },
+        {
+          "period": "2021-Q2",
+          "doc_count": 1
+        },
+        {
+          "period": "2021-Q3",
+          "doc_count": 1
+        },
+        {
+          "period": "2021-Q4",
+          "doc_count": 1
+        },
+        {
+          "period": "2022-Q1",
+          "doc_count": 1
+        },
+        {
+          "period": "2022-Q2",
+          "doc_count": 1
+        },
+        {
+          "period": "2022-Q4",
+          "doc_count": 1
+        },
+        {
+          "period": "2023-Q2",
+          "doc_count": 1
+        },
+        {
+          "period": "2023-Q4",
+          "doc_count": 2
+        },
+        {
+          "period": "2025-Q2",
+          "doc_count": 1
+        }
+      ]
+    },
+    {
+      "trend_id": 36,
+      "topic_id": 36,
+      "title": "Advancing Circular Economy in Building Materials",
+      "maturity": "established",
+      "emergence": 0.010130643844604492,
+      "size": 19,
+      "label": "circular, economy, materials",
+      "pestel": "[\"environmental\"]",
+      "category": "climate",
+      "impact": 8.36,
+      "uncertainty": 4.015195965766907,
+      "urgency": 5.5101306438446045,
+      "radar_stage": "prepare",
+      "timepoints": [
+        {
+          "period": "2008-Q2",
+          "doc_count": 1
+        },
+        {
+          "period": "2017-Q4",
+          "doc_count": 1
+        },
+        {
+          "period": "2019-Q1",
+          "doc_count": 2
+        },
+        {
+          "period": "2019-Q4",
+          "doc_count": 1
+        },
+        {
+          "period": "2021-Q2",
+          "doc_count": 2
+        },
+        {
+          "period": "2022-Q3",
+          "doc_count": 1
+        },
+        {
+          "period": "2025-Q2",
+          "doc_count": 1
+        },
+        {
+          "period": "2025-Q3",
+          "doc_count": 1
+        }
+      ]
+    },
+    {
+      "trend_id": 33,
+      "topic_id": 33,
+      "title": "China Advances National Green Building Standards",
+      "maturity": "established",
+      "emergence": 0.2800405025482178,
+      "size": 17,
+      "label": "green, china, building",
+      "pestel": "[\"environmental\", \"political\"]",
+      "category": "climate",
+      "impact": 8.28,
+      "uncertainty": 4.420060753822327,
+      "urgency": 6.446707169214884,
+      "radar_stage": "act",
+      "timepoints": [
+        {
+          "period": "2012-Q2",
+          "doc_count": 1
+        },
+        {
+          "period": "2014-Q4",
+          "doc_count": 1
+        },
+        {
+          "period": "2017-Q3",
+          "doc_count": 1
+        },
+        {
+          "period": "2018-Q1",
+          "doc_count": 1
+        },
+        {
+          "period": "2020-Q2",
+          "doc_count": 1
+        },
+        {
+          "period": "2020-Q4",
+          "doc_count": 1
+        },
+        {
+          "period": "2023-Q1",
+          "doc_count": 1
+        }
+      ]
+    },
+    {
+      "trend_id": 45,
+      "topic_id": 45,
+      "title": "Generative AI Transforms Architectural Facade Design",
+      "maturity": "established",
+      "emergence": 0.258081316947937,
+      "size": 17,
+      "label": "ai, generative, facade",
+      "pestel": "[\"technological\"]",
+      "category": "technology",
+      "impact": 8.28,
+      "uncertainty": 3.8871219754219055,
+      "urgency": 5.258081316947937,
+      "radar_stage": "prepare",
+      "timepoints": [
+        {
+          "period": "2020-Q4",
+          "doc_count": 1
+        },
+        {
+          "period": "2021-Q4",
+          "doc_count": 1
+        },
+        {
+          "period": "2022-Q2",
+          "doc_count": 1
+        },
+        {
+          "period": "2023-Q1",
+          "doc_count": 1
+        },
+        {
+          "period": "2023-Q4",
+          "doc_count": 1
+        },
+        {
+          "period": "2024-Q2",
+          "doc_count": 1
+        },
+        {
+          "period": "2024-Q3",
+          "doc_count": 1
+        },
+        {
+          "period": "2024-Q4",
+          "doc_count": 1
+        },
+        {
+          "period": "2025-Q1",
+          "doc_count": 1
+        },
+        {
+          "period": "2025-Q2",
+          "doc_count": 1
+        },
+        {
+          "period": "2025-Q3",
+          "doc_count": 1
+        },
+        {
+          "period": "2026-Q1",
+          "doc_count": 1
+        }
+      ]
+    },
+    {
+      "trend_id": 42,
+      "topic_id": 42,
+      "title": "AI and Automation Transforming Construction Management",
+      "maturity": "established",
+      "emergence": 0.0800858736038208,
+      "size": 16,
+      "label": "construction, automation, project",
+      "pestel": "[\"technological\", \"environmental\"]",
+      "category": "technology",
+      "impact": 8.24,
+      "uncertainty": 4.620128810405731,
+      "urgency": 6.080085873603821,
+      "radar_stage": "act",
+      "timepoints": [
+        {
+          "period": "1999-Q3",
+          "doc_count": 1
+        },
+        {
+          "period": "2003-Q3",
+          "doc_count": 1
+        },
+        {
+          "period": "2018-Q3",
+          "doc_count": 1
+        },
+        {
+          "period": "2021-Q2",
+          "doc_count": 1
+        },
+        {
+          "period": "2021-Q4",
+          "doc_count": 1
+        },
+        {
+          "period": "2022-Q2",
+          "doc_count": 2
+        },
+        {
+          "period": "2022-Q3",
+          "doc_count": 1
+        },
+        {
+          "period": "2025-Q3",
+          "doc_count": 1
+        }
+      ]
+    },
+    {
+      "trend_id": 39,
+      "topic_id": 39,
+      "title": "Rise of Digital Twins in Urban Planning",
+      "maturity": "established",
+      "emergence": 0.3758200407028198,
+      "size": 11,
+      "label": "digital, cities, urban",
+      "pestel": "[\"technological\", \"social\"]",
+      "category": "technology",
+      "impact": 8.04,
+      "uncertainty": 4.56373006105423,
+      "urgency": 5.87582004070282,
+      "radar_stage": "prepare",
+      "timepoints": [
+        {
+          "period": "2012-Q4",
+          "doc_count": 1
+        },
+        {
+          "period": "2015-Q1",
+          "doc_count": 1
+        },
+        {
+          "period": "2020-Q1",
+          "doc_count": 1
+        },
+        {
+          "period": "2021-Q1",
+          "doc_count": 2
+        },
+        {
+          "period": "2022-Q3",
+          "doc_count": 1
+        },
+        {
+          "period": "2024-Q2",
+          "doc_count": 1
+        },
+        {
+          "period": "2024-Q4",
+          "doc_count": 1
+        },
+        {
+          "period": "2025-Q3",
+          "doc_count": 1
+        }
+      ]
+    },
+    {
+      "trend_id": 37,
+      "topic_id": 37,
+      "title": "Integrated Solar Solutions for Sustainable Buildings",
+      "maturity": "megatrend",
+      "emergence": 0.17382526397705078,
+      "size": 21,
+      "label": "solar, grid, battery",
+      "pestel": "[\"environmental\", \"technological\"]",
+      "category": "technology",
+      "impact": 7.8,
+      "uncertainty": 5.260737895965576,
+      "urgency": 6.673825263977051,
+      "radar_stage": "act",
+      "timepoints": [
+        {
+          "period": "1982-Q1",
+          "doc_count": 1
+        },
+        {
+          "period": "1991-Q4",
+          "doc_count": 1
+        },
+        {
+          "period": "2005-Q4",
+          "doc_count": 1
+        },
+        {
+          "period": "2010-Q3",
+          "doc_count": 1
+        },
+        {
+          "period": "2010-Q4",
+          "doc_count": 1
+        },
+        {
+          "period": "2011-Q4",
+          "doc_count": 1
+        },
+        {
+          "period": "2013-Q2",
+          "doc_count": 1
+        },
+        {
+          "period": "2013-Q3",
+          "doc_count": 1
+        },
+        {
+          "period": "2014-Q1",
+          "doc_count": 1
+        },
+        {
+          "period": "2014-Q2",
+          "doc_count": 2
+        },
+        {
+          "period": "2014-Q4",
+          "doc_count": 1
+        },
+        {
+          "period": "2017-Q1",
+          "doc_count": 1
+        },
+        {
+          "period": "2018-Q2",
+          "doc_count": 1
+        },
+        {
+          "period": "2018-Q4",
+          "doc_count": 1
+        },
+        {
+          "period": "2020-Q3",
+          "doc_count": 1
+        },
+        {
+          "period": "2023-Q1",
+          "doc_count": 3
+        },
+        {
+          "period": "2023-Q3",
+          "doc_count": 1
+        }
+      ]
+    },
+    {
+      "trend_id": 40,
+      "topic_id": 40,
+      "title": "Growing Adoption of BIPV in Architectural Design",
+      "maturity": "emerging",
+      "emergence": 0.06674468517303467,
+      "size": 22,
+      "label": "bipv, integrated, photovoltaics",
+      "pestel": "[\"technological\", \"environmental\"]",
+      "category": "technology",
+      "impact": 7.8,
+      "uncertainty": 4.100117027759552,
+      "urgency": 6.566744685173035,
+      "radar_stage": "act",
+      "timepoints": [
+        {
+          "period": "2008-Q1",
+          "doc_count": 1
+        },
+        {
+          "period": "2011-Q3",
+          "doc_count": 1
+        },
+        {
+          "period": "2016-Q3",
+          "doc_count": 1
+        },
+        {
+          "period": "2019-Q3",
+          "doc_count": 1
+        },
+        {
+          "period": "2021-Q4",
+          "doc_count": 1
+        },
+        {
+          "period": "2024-Q1",
+          "doc_count": 1
+        },
+        {
+          "period": "2024-Q3",
+          "doc_count": 1
+        },
+        {
+          "period": "2024-Q4",
+          "doc_count": 2
+        },
+        {
+          "period": "2025-Q1",
+          "doc_count": 1
+        }
+      ]
+    },
+    {
+      "trend_id": 38,
+      "topic_id": 38,
+      "title": "Advancements in Industrialized Construction Technologies",
+      "maturity": "emerging",
+      "emergence": 0.20271921157836914,
+      "size": 8,
+      "label": "construction, dfma, industrialization",
+      "pestel": "[\"technological\"]",
+      "category": "technology",
+      "impact": 7.32,
+      "uncertainty": 4.804078817367554,
+      "urgency": 7.036052544911702,
+      "radar_stage": "act",
+      "timepoints": [
+        {
+          "period": "2005-Q1",
+          "doc_count": 1
+        },
+        {
+          "period": "2020-Q1",
+          "doc_count": 1
+        },
+        {
+          "period": "2020-Q2",
+          "doc_count": 1
+        },
+        {
+          "period": "2020-Q3",
+          "doc_count": 1
+        },
+        {
+          "period": "2020-Q4",
+          "doc_count": 1
+        },
+        {
+          "period": "2021-Q2",
+          "doc_count": 2
+        },
+        {
+          "period": "2022-Q1",
+          "doc_count": 1
+        }
+      ]
+    },
+    {
+      "trend_id": 41,
+      "topic_id": 41,
+      "title": "Drones Transform Facade Cleaning and Inspections",
+      "maturity": "weak_signal",
+      "emergence": 0.3284420967102051,
+      "size": 13,
+      "label": "facade, drone, cleaning",
+      "pestel": "[\"technological\"]",
+      "category": "technology",
+      "impact": 6.52,
+      "uncertainty": 4.492663145065308,
+      "urgency": 5.828442096710205,
+      "radar_stage": "prepare",
+      "timepoints": [
+        {
+          "period": "2025-Q3",
+          "doc_count": 1
+        }
+      ]
+    },
+    {
+      "trend_id": 46,
+      "topic_id": 46,
+      "title": "Digital Transformation Driving Construction Servitization",
+      "maturity": "weak_signal",
+      "emergence": 0.12313556671142578,
+      "size": 12,
+      "label": "construction, servitization, industry",
+      "pestel": "[\"technological\"]",
+      "category": "digital",
+      "impact": 6.48,
+      "uncertainty": 4.184703350067139,
+      "urgency": 5.623135566711426,
+      "radar_stage": "prepare",
+      "timepoints": [
+        {
+          "period": "2022-Q3",
+          "doc_count": 1
+        }
+      ]
+    },
+    {
+      "trend_id": 44,
+      "topic_id": 44,
+      "title": "IoT Expands with 5G Connectivity and Devices",
+      "maturity": "weak_signal",
+      "emergence": 0.5763328075408936,
+      "size": 9,
+      "label": "iot, internet, things",
+      "pestel": "[\"technological\"]",
+      "category": "technology",
+      "impact": 6.359999999999999,
+      "uncertainty": 5.36449921131134,
+      "urgency": 8.076332807540894,
+      "radar_stage": "prepare",
+      "timepoints": [
+        {
+          "period": "2013-Q1",
+          "doc_count": 1
+        },
+        {
+          "period": "2015-Q2",
+          "doc_count": 1
+        },
+        {
+          "period": "2020-Q1",
+          "doc_count": 1
+        }
+      ]
+    },
+    {
+      "trend_id": 35,
+      "topic_id": 35,
+      "title": "Growth of Advanced Materials Market Accelerates",
+      "maturity": "weak_signal",
+      "emergence": 0.4800671935081482,
+      "size": 8,
+      "label": "blast, advanced, materials",
+      "pestel": "[\"economic\", \"technological\"]",
+      "category": "markets",
+      "impact": 6.32,
+      "uncertainty": 5.220100790262222,
+      "urgency": 5.980067193508148,
+      "radar_stage": "prepare",
+      "timepoints": [
+        {
+          "period": "2009-Q4",
+          "doc_count": 1
+        }
+      ]
+    },
+    {
+      "trend_id": 47,
+      "topic_id": 47,
+      "title": "Curtain Wall Market Projected to Surge",
+      "maturity": "weak_signal",
+      "emergence": 0.013315260410308838,
+      "size": 6,
+      "label": "curtain, market, size",
+      "pestel": "[\"economic\"]",
+      "category": "markets",
+      "impact": 6.24,
+      "uncertainty": 4.519972890615463,
+      "urgency": 5.513315260410309,
+      "radar_stage": "prepare",
+      "timepoints": []
+    },
+    {
+      "trend_id": 50,
+      "topic_id": 50,
+      "title": "Shifting Towards Renewable Energy Solutions",
+      "maturity": "weak_signal",
+      "emergence": 0.6291025876998901,
+      "size": 4,
+      "label": "energy, enérgeia, britannica",
+      "pestel": "[\"environmental\", \"economic\"]",
+      "category": "climate",
+      "impact": 6.16,
+      "uncertainty": 5.443653881549835,
+      "urgency": 6.12910258769989,
+      "radar_stage": "prepare",
+      "timepoints": []
+    }
+  ],
+  "distributions": {
+    "maturity": {
+      "established": 7,
+      "megatrend": 3,
+      "emerging": 2,
+      "weak_signal": 6
+    },
+    "pestel": {
+      "[\"environmental\", \"social\"]": 1,
+      "[\"technological\", \"environmental\"]": 4,
+      "[\"environmental\"]": 2,
+      "[\"environmental\", \"political\"]": 1,
+      "[\"technological\"]": 5,
+      "[\"technological\", \"social\"]": 1,
+      "[\"environmental\", \"technological\"]": 1,
+      "[\"economic\", \"technological\"]": 1,
+      "[\"economic\"]": 1,
+      "[\"environmental\", \"economic\"]": 1
+    },
+    "radar_stage": {
+      "act": 7,
+      "prepare": 11
+    },
+    "category": {
+      "climate": 5,
+      "technology": 10,
+      "digital": 1,
+      "markets": 2
+    }
+  }
+}
