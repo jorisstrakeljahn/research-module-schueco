@@ -11,10 +11,10 @@ import { useI18n } from "@/lib/i18n";
 // Schüco-style Trendradar: PESTEL sectors (angle) x Act/Prepare/Watch rings
 // (radius) x thematic category (colour) x corpus share (dot size).
 
-const SIZE = 560;
+const SIZE = 720;
 const C = SIZE / 2;
-const MAX_R = 240;
-const PAD = 76; // breathing room so sector labels are never clipped
+const MAX_R = 308;
+const PAD = 92; // breathing room so sector labels are never clipped
 const N_SECTORS = PESTEL_SECTORS.length;
 const SECTOR_DEG = 360 / N_SECTORS;
 const RING_BANDS: Record<number, [number, number]> = {
@@ -64,19 +64,21 @@ export default function TrendRadar({
     const angle = sec * SECTOR_DEG + (0.2 + 0.6 * jitter(t.id, 1)) * SECTOR_DEG;
     const radius = (inner + (outer - inner) * jitter(t.id, 2)) * MAX_R;
     const { x, y } = polar(angle, radius);
-    const r = 5 + (t.size / maxSize) * 9;
+    const r = 6 + (t.size / maxSize) * 12;
     const color = CATEGORY_META[t.category ?? "technology"]?.color ?? "#9ca3af";
     return { trend: t, x, y, r, color };
   });
 
   return (
-    <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
-      <svg
-        viewBox={`${-PAD} ${-PAD} ${SIZE + 2 * PAD} ${SIZE + 2 * PAD}`}
-        className="mx-auto w-full max-w-[600px]"
-        role="img"
-        aria-label="Radar"
-      >
+    <div className="@container flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-hidden xl:flex-row xl:items-stretch">
+      <div className="flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-hidden">
+        <svg
+          viewBox={`${-PAD} ${-PAD} ${SIZE + 2 * PAD} ${SIZE + 2 * PAD}`}
+          className="aspect-square h-[min(920px,100cqmin,calc(100dvh-11rem))] w-[min(920px,100cqmin,calc(100dvh-11rem))] transition-[width,height] duration-200 ease-out"
+          role="img"
+          aria-label="Radar"
+          preserveAspectRatio="xMidYMid meet"
+        >
         {[2, 1, 0].map((ring) => (
           <circle
             key={ring}
@@ -105,7 +107,7 @@ export default function TrendRadar({
         })}
 
         {PESTEL_SECTORS.map((s, i) => {
-          const { x, y } = polar(i * SECTOR_DEG + SECTOR_DEG / 2, MAX_R + 24);
+          const { x, y } = polar(i * SECTOR_DEG + SECTOR_DEG / 2, MAX_R + 30);
           return (
             <text
               key={s.key}
@@ -114,7 +116,7 @@ export default function TrendRadar({
               textAnchor="middle"
               dominantBaseline="middle"
               fill="var(--muted)"
-              style={{ fontSize: 11, fontWeight: 500 }}
+              style={{ fontSize: 13, fontWeight: 600 }}
             >
               {s.label}
             </text>
@@ -131,7 +133,7 @@ export default function TrendRadar({
               textAnchor="middle"
               dominantBaseline="middle"
               fill="var(--faint)"
-              style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: 1 }}
+              style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 1.2 }}
             >
               {Object.values(RADAR_STAGE_META).find((m) => m.ring === ring)?.label}
             </text>
@@ -167,9 +169,10 @@ export default function TrendRadar({
             </circle>
           );
         })}
-      </svg>
+        </svg>
+      </div>
 
-      <div className="shrink-0 space-y-5 border-t border-border pt-5 text-xs lg:w-48 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
+      <div className="shrink-0 space-y-4 border-t border-border pt-4 text-xs xl:w-44 xl:border-l xl:border-t-0 xl:pl-5 xl:pt-1">
         <div>
           <p className="mb-2 font-medium uppercase tracking-wider text-faint">
             {t("radar.legend.category")}

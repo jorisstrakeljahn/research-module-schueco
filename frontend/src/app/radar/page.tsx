@@ -63,7 +63,7 @@ export default function RadarPage() {
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <PageHeader title={t("radar.title")} subtitle={t("radar.subtitle")} />
 
-        <div className="flex-1 overflow-auto p-6">
+        <div className="flex min-h-0 flex-1 flex-col p-4 lg:p-5">
           {loading ? (
             <p className="text-sm text-muted">{t("radar.loading")}</p>
           ) : error ? (
@@ -71,7 +71,7 @@ export default function RadarPage() {
           ) : filtered.length === 0 ? (
             <p className="text-sm text-muted">{t("radar.empty")}</p>
           ) : (
-            <div className="rounded-xl border border-border bg-surface p-6 shadow-sm">
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-surface p-3 shadow-sm lg:p-4">
               <TrendRadar
                 trends={filtered}
                 selectedId={selected?.id ?? null}

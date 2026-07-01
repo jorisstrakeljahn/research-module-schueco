@@ -21,7 +21,7 @@ export default function TrendDetailPanel({
   );
 
   return (
-    <aside className="w-96 shrink-0 overflow-auto border-l border-border bg-surface">
+    <aside className="flex w-96 min-h-0 shrink-0 flex-col overflow-hidden border-l border-border bg-surface">
       <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-surface px-6 py-5">
         <h3 className="text-sm font-medium text-fg">{t("detail.panelTitle")}</h3>
         <button
@@ -33,14 +33,14 @@ export default function TrendDetailPanel({
         </button>
       </div>
 
-      <div className="space-y-6 px-6 pb-6">
-        <div>
+      <div className="flex-1 overflow-auto">
+        <div className="space-y-6 px-6 pb-6">
           <TrendBadges trend={trend} className="mb-4" />
           <h2 className="mb-3 text-xl text-fg">{trend.title}</h2>
           <p className="text-sm text-muted">{trend.summary}</p>
         </div>
 
-        <div className="space-y-4 border-t border-border pt-6">
+        <div className="space-y-4 border-t border-border px-6 pt-6 pb-6">
           <Field label={t("detail.pestelSectors")}>
             <div className="flex flex-wrap gap-1.5">
               {sectors.length > 0 ? (
@@ -73,14 +73,14 @@ export default function TrendDetailPanel({
           <Field label={t("detail.keywords")}>
             <span className="text-sm text-muted">{trend.keywords.join(", ")}</span>
           </Field>
-        </div>
 
-        <Link
-          href={`/trends/${trend.id}`}
-          className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-3 text-white transition-colors hover:bg-primary-bright"
-        >
-          {t("detail.fullDetails")} <ArrowUpRight className="h-4 w-4" />
-        </Link>
+          <Link
+            href={`/trends/${trend.id}`}
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-3 text-white transition-colors hover:bg-primary-bright"
+          >
+            {t("detail.fullDetails")} <ArrowUpRight className="h-4 w-4" />
+          </Link>
+        </div>
       </div>
     </aside>
   );
