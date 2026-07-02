@@ -74,7 +74,7 @@ export default function TrendRadar({
       <div className="flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-hidden">
         <svg
           viewBox={`${-PAD} ${-PAD} ${SIZE + 2 * PAD} ${SIZE + 2 * PAD}`}
-          className="aspect-square h-[min(920px,100cqmin,calc(100dvh-11rem))] w-[min(920px,100cqmin,calc(100dvh-11rem))] transition-[width,height] duration-200 ease-out"
+          className="aspect-square h-[min(920px,100cqmin,calc(100dvh-12rem))] max-h-full max-w-full w-[min(920px,100cqmin,calc(100dvh-12rem))] transition-[width,height] duration-200 ease-out"
           role="img"
           aria-label="Radar"
           preserveAspectRatio="xMidYMid meet"
@@ -172,7 +172,7 @@ export default function TrendRadar({
         </svg>
       </div>
 
-      <div className="shrink-0 space-y-4 border-t border-border pt-4 text-xs xl:w-44 xl:border-l xl:border-t-0 xl:pl-5 xl:pt-1">
+      <div className="min-w-0 shrink-0 space-y-4 overflow-auto border-t border-border pt-4 text-xs xl:w-44 xl:border-l xl:border-t-0 xl:pl-5 xl:pt-1">
         <div>
           <p className="mb-2 font-medium uppercase tracking-wider text-faint">
             {t("radar.legend.category")}

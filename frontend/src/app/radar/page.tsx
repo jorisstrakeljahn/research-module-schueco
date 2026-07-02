@@ -49,7 +49,7 @@ export default function RadarPage() {
   );
 
   return (
-    <div className="flex h-full overflow-hidden">
+    <div className="relative flex h-full min-w-0 overflow-hidden">
       <FilterPanel
         selectedMaturities={maturities}
         selectedPestel={pestel}
@@ -83,7 +83,15 @@ export default function RadarPage() {
       </div>
 
       {selected && (
-        <TrendDetailPanel trend={selected} onClose={() => setSelected(null)} />
+        <>
+          <button
+            type="button"
+            aria-label="close"
+            className="fixed inset-0 z-10 bg-fg/20 lg:hidden"
+            onClick={() => setSelected(null)}
+          />
+          <TrendDetailPanel trend={selected} onClose={() => setSelected(null)} />
+        </>
       )}
     </div>
   );
