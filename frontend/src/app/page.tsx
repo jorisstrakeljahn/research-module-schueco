@@ -111,7 +111,7 @@ export default function DashboardPage() {
   const actCount = trends.filter((t) => t.radar_stage === "act").length;
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full min-w-0 flex-col overflow-hidden">
       <PageHeader title={t("dashboard.title")} subtitle={t("dashboard.subtitle")} />
       {loading ? (
         <p className="p-6 text-sm text-muted">{t("dashboard.loading")}</p>

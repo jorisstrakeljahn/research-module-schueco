@@ -70,7 +70,7 @@ export default function NewsfeedPage() {
   }
 
   return (
-    <div className="flex h-full overflow-hidden">
+    <div className="flex h-full min-w-0 overflow-hidden">
       <FilterPanel
         selectedMaturities={maturities}
         selectedPestel={pestel}
