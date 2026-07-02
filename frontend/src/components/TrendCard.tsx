@@ -34,7 +34,7 @@ export default function TrendCard({ trend }: { trend: Trend }) {
         )}
       </div>
       <Link
-        href={`/trends/${trend.id}`}
+        href={`/trends/${trend.id}?from=newsfeed`}
         className="block font-medium leading-snug text-fg hover:text-primary"
       >
         {trend.title}

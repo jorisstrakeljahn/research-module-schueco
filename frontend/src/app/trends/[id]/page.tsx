@@ -2,7 +2,7 @@
 
 import { ArrowLeft, Languages } from "lucide-react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -21,10 +21,27 @@ import { useI18n } from "@/lib/i18n";
 
 type Override = { title: string; summary: string; rationale: string | null };
 
+type BackSource = "newsfeed" | "radar" | "dashboard";
+
+const BACK_BY_SOURCE: Record<
+  BackSource,
+  { href: string; labelKey: "detail.backNewsfeed" | "detail.backRadar" | "detail.backDashboard" }
+> = {
+  newsfeed: { href: "/newsfeed", labelKey: "detail.backNewsfeed" },
+  radar: { href: "/radar", labelKey: "detail.backRadar" },
+  dashboard: { href: "/", labelKey: "detail.backDashboard" },
+};
+
 export default function TrendDetailPage() {
   const { t, lang } = useI18n();
   const params = useParams<{ id: string }>();
+  const searchParams = useSearchParams();
   const trendId = Number(params.id);
+  const from = searchParams.get("from");
+  const back =
+    from && from in BACK_BY_SOURCE
+      ? BACK_BY_SOURCE[from as BackSource]
+      : { href: "/radar", labelKey: "detail.back" as const };
   const [trend, setTrend] = useState<TrendDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [override, setOverride] = useState<Override | null>(null);
@@ -60,13 +77,13 @@ export default function TrendDetailPage() {
   const rationale = override ? override.rationale : trend.rationale;
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full min-w-0 flex-col overflow-hidden">
       <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-bg px-6">
         <Link
-          href="/radar"
+          href={back.href}
           className="inline-flex items-center gap-1.5 text-sm text-muted transition-colors hover:text-fg"
         >
-          <ArrowLeft className="h-4 w-4" /> {t("detail.back")}
+          <ArrowLeft className="h-4 w-4" /> {t(back.labelKey)}
         </Link>
         <button
           onClick={doTranslate}

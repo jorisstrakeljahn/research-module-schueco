@@ -131,6 +131,9 @@ const messages: Record<Lang, Dict> = {
     "card.docs": "{n} Dokumente",
 
     "detail.back": "Zurück zum Radar",
+    "detail.backNewsfeed": "Zurück zum Newsfeed",
+    "detail.backRadar": "Zurück zum Radar",
+    "detail.backDashboard": "Zurück zum Dashboard",
     "detail.translate": "Übersetzen",
     "detail.translating": "Übersetze…",
     "detail.showOriginal": "Original anzeigen",
@@ -251,6 +254,9 @@ const messages: Record<Lang, Dict> = {
     "card.docs": "{n} documents",
 
     "detail.back": "Back to radar",
+    "detail.backNewsfeed": "Back to newsfeed",
+    "detail.backRadar": "Back to radar",
+    "detail.backDashboard": "Back to dashboard",
     "detail.translate": "Translate",
     "detail.translating": "Translating…",
     "detail.showOriginal": "Show original",
