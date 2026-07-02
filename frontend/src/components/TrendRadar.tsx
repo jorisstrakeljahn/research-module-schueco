@@ -1,5 +1,7 @@
 "use client";
 
+import { useLayoutEffect, useRef, useState, type RefObject } from "react";
+
 import {
   CATEGORY_META,
   PESTEL_SECTORS,
@@ -15,6 +17,8 @@ const SIZE = 720;
 const C = SIZE / 2;
 const MAX_R = 308;
 const PAD = 92; // breathing room so sector labels are never clipped
+const MAX_CHART_PX = 920;
+const MIN_CHART_PX = 300;
 const N_SECTORS = PESTEL_SECTORS.length;
 const SECTOR_DEG = 360 / N_SECTORS;
 const RING_BANDS: Record<number, [number, number]> = {
@@ -46,6 +50,29 @@ function stageRing(trend: Trend): number {
   return RADAR_STAGE_META[trend.radar_stage ?? "watch"]?.ring ?? 2;
 }
 
+function useChartSize(): { ref: RefObject<HTMLDivElement | null>; size: number } {
+  const ref = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState(MIN_CHART_PX);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    const update = () => {
+      const { width, height } = el.getBoundingClientRect();
+      const next = Math.min(width, height, MAX_CHART_PX);
+      setSize(Math.max(MIN_CHART_PX, Math.floor(next)));
+    };
+
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  return { ref, size };
+}
+
 export default function TrendRadar({
   trends,
   selectedId,
@@ -56,6 +83,7 @@ export default function TrendRadar({
   onSelect?: (t: Trend) => void;
 }) {
   const { t } = useI18n();
+  const { ref: chartRef, size: chartSize } = useChartSize();
   const maxSize = Math.max(1, ...trends.map((t) => t.size));
 
   const placed = trends.map((t) => {
@@ -70,11 +98,16 @@ export default function TrendRadar({
   });
 
   return (
-    <div className="@container flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-hidden xl:flex-row xl:items-stretch">
-      <div className="flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-hidden">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-hidden xl:flex-row xl:items-stretch xl:gap-4">
+      <div
+        ref={chartRef}
+        className="flex min-h-[min(480px,58dvh)] min-w-0 flex-1 items-center justify-center overflow-hidden xl:min-h-0"
+      >
         <svg
           viewBox={`${-PAD} ${-PAD} ${SIZE + 2 * PAD} ${SIZE + 2 * PAD}`}
-          className="aspect-square h-[min(920px,100cqmin,calc(100dvh-12rem))] max-h-full max-w-full w-[min(920px,100cqmin,calc(100dvh-12rem))] transition-[width,height] duration-200 ease-out"
+          width={chartSize}
+          height={chartSize}
+          className="shrink-0 transition-[width,height] duration-200 ease-out"
           role="img"
           aria-label="Radar"
           preserveAspectRatio="xMidYMid meet"
@@ -172,7 +205,7 @@ export default function TrendRadar({
         </svg>
       </div>
 
-      <div className="min-w-0 shrink-0 space-y-4 overflow-auto border-t border-border pt-4 text-xs xl:w-44 xl:border-l xl:border-t-0 xl:pl-5 xl:pt-1">
+      <div className="min-w-0 shrink-0 space-y-3 overflow-auto border-t border-border pt-3 text-xs xl:w-44 xl:border-l xl:border-t-0 xl:pl-5 xl:pt-0">
         <div>
           <p className="mb-2 font-medium uppercase tracking-wider text-faint">
             {t("radar.legend.category")}
