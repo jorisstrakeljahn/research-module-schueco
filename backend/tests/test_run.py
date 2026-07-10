@@ -15,12 +15,17 @@ from app.models import (
     PESTEL_DIMENSIONS,
     RADAR_STAGES,
     TREND_CATEGORIES,
+    CanonicalTrend,
     Chunk,
+    Document,
+    DocumentEmbedding,
     Run,
+    RunDocument,
     Topic,
     TopicTimepoint,
     Trend,
     TrendAssessment,
+    TrendOccurrence,
 )
 from app.pipeline import run as run_module
 from app.pipeline.run import run_pipeline
@@ -163,3 +168,39 @@ def test_emergence_is_scored_against_previous_run(session):
     assert trends
     assert all(t.emergence is not None for t in trends)
     assert all(t.emergence < 0.2 for t in trends)
+
+
+@requires_db
+def test_runs_use_cumulative_corpus_dedup_and_embedding_cache(session):
+    docs = _make_docs()
+    first = run_pipeline("buildings", session=session, raw_docs=docs)
+    extra = RawDocument(
+        external_id="ext-new",
+        title="New circular facade material",
+        text="circular facade material reuse construction",
+        url="https://example.org/new?utm_source=test",
+        published_at=datetime(2025, 1, 1, tzinfo=UTC),
+        source_name="TestSource",
+        source_type="science",
+    )
+    second = run_pipeline("buildings", session=session, raw_docs=[*docs, extra])
+
+    assert first.n_documents == 8
+    assert second.n_documents == 9
+    assert len(session.exec(select(Document)).all()) == 9
+    assert len(session.exec(select(DocumentEmbedding)).all()) == 9
+
+    memberships = session.exec(
+        select(RunDocument).where(RunDocument.run_id == second.id)
+    ).all()
+    assert len(memberships) == 9
+    assert sum(item.provenance == "new" for item in memberships) == 1
+    assert sum(item.provenance == "carried_forward" for item in memberships) == 8
+    assert second.corpus_hash and second.component_manifest
+
+    occurrences = session.exec(
+        select(TrendOccurrence).where(TrendOccurrence.run_id == second.id)
+    ).all()
+    assert occurrences
+    assert all(item.change_type in {"updated", "unchanged", "review"} for item in occurrences)
+    assert session.exec(select(CanonicalTrend)).all()

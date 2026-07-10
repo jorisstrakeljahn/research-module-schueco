@@ -26,6 +26,7 @@ class TopicInfo:
 class TopicResult:
     labels: list[int]  # topic index per document (-1 = outlier / no topic)
     topics: list[TopicInfo] = field(default_factory=list)
+    probabilities: list[float | None] = field(default_factory=list)
 
 
 class TopicModeler(Protocol):
@@ -113,20 +114,97 @@ class SimpleTopicModeler:
                     size=int(np.sum(labels == cluster)),
                 )
             )
-        return TopicResult(labels=[int(x) for x in labels], topics=topics)
+        return TopicResult(
+            labels=[int(x) for x in labels],
+            topics=topics,
+            probabilities=[1.0] * n,
+        )
 
 
 class BERTopicModeler:
     """Scientific default using BERTopic (Grootendorst, 2022). Requires ``ml`` extra."""
 
-    def __init__(self, n_topics: int | None = None) -> None:
+    def __init__(
+        self,
+        n_topics: int | None = None,
+        *,
+        max_topics: int = 12,
+        random_state: int = 42,
+        min_cluster_size: int = 8,
+    ) -> None:
         self.n_topics = n_topics
+        self.max_topics = max_topics
+        self.random_state = random_state
+        self.min_cluster_size = min_cluster_size
 
     def fit(self, texts: list[str], embeddings: np.ndarray) -> TopicResult:
-        from bertopic import BERTopic
+        if not texts:
+            return TopicResult(labels=[])
+        if len(texts) < 4:
+            return SimpleTopicModeler(
+                n_topics=1,
+                random_state=self.random_state,
+            ).fit(texts, embeddings)
 
-        model = BERTopic(nr_topics=self.n_topics, calculate_probabilities=False)
-        labels, _ = model.fit_transform(texts, embeddings=embeddings)
+        from bertopic import BERTopic
+        from hdbscan import HDBSCAN
+        from sklearn.cluster import KMeans
+        from sklearn.feature_extraction.text import CountVectorizer
+        from umap import UMAP
+
+        def make_model(cluster_model) -> BERTopic:
+            return BERTopic(
+                nr_topics=self.n_topics,
+                calculate_probabilities=False,
+                umap_model=UMAP(
+                    n_neighbors=min(15, max(2, len(texts) - 1)),
+                    n_components=5,
+                    min_dist=0.0,
+                    metric="cosine",
+                    random_state=self.random_state,
+                    n_jobs=1,
+                ),
+                hdbscan_model=cluster_model,
+                vectorizer_model=CountVectorizer(
+                    ngram_range=(1, 2),
+                    min_df=1,
+                    stop_words="english",
+                    lowercase=True,
+                ),
+                top_n_words=8,
+                verbose=False,
+            )
+
+        hdbscan_model = HDBSCAN(
+            min_cluster_size=self.min_cluster_size,
+            min_samples=max(2, self.min_cluster_size // 2),
+            metric="euclidean",
+            cluster_selection_method="eom",
+            prediction_data=True,
+            core_dist_n_jobs=1,
+        )
+        model = make_model(hdbscan_model)
+        labels, probabilities = model.fit_transform(texts, embeddings=embeddings)
+
+        # Dense, domain-specific corpora can make HDBSCAN collapse into one or two
+        # giant clusters. That is mathematically valid but unusable for a trend
+        # portfolio. Keep BERTopic's UMAP + c-TF-IDF representation and retry its
+        # pluggable clustering stage with deterministic K-Means only when this
+        # degeneracy is detected.
+        target_topics = self.n_topics or min(
+            self.max_topics, max(2, round((len(texts) / 2) ** 0.5))
+        )
+        discovered = len({int(label) for label in labels if int(label) >= 0})
+        minimum_useful = min(target_topics, max(3, target_topics // 2))
+        if len(texts) >= target_topics and discovered < minimum_useful:
+            model = make_model(
+                KMeans(
+                    n_clusters=target_topics,
+                    n_init=10,
+                    random_state=self.random_state,
+                )
+            )
+            labels, probabilities = model.fit_transform(texts, embeddings=embeddings)
         topics: list[TopicInfo] = []
         for topic_index in sorted(set(int(x) for x in labels)):
             words = model.get_topic(topic_index) or []
@@ -140,16 +218,35 @@ class BERTopicModeler:
                     size=int(sum(1 for x in labels if x == topic_index)),
                 )
             )
-        return TopicResult(labels=[int(x) for x in labels], topics=topics)
+        probability_values = (
+            [float(value) for value in probabilities]
+            if probabilities is not None
+            else [None] * len(labels)
+        )
+        return TopicResult(
+            labels=[int(x) for x in labels],
+            topics=topics,
+            probabilities=probability_values,
+        )
 
 
 def get_topic_modeler(
-    name: str, n_topics: int | None = None, max_topics: int = 12
+    name: str,
+    n_topics: int | None = None,
+    max_topics: int = 12,
+    *,
+    random_state: int = 42,
+    min_cluster_size: int = 8,
 ) -> TopicModeler:
     """Factory: resolve a topic modeler by name."""
     name = name.lower()
     if name == "simple":
         return SimpleTopicModeler(n_topics=n_topics, max_topics=max_topics)
     if name == "bertopic":
-        return BERTopicModeler(n_topics=n_topics)
+        return BERTopicModeler(
+            n_topics=n_topics,
+            max_topics=max_topics,
+            random_state=random_state,
+            min_cluster_size=min_cluster_size,
+        )
     raise ValueError(f"Unknown topic model: {name!r}")

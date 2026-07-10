@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 from app.ingestion.base import RawDocument
-from app.models import ExpertFeedback, Run, Topic, Trend
+from app.models import CanonicalTrend, ExpertFeedback, Run, Topic, Trend, TrendOccurrence
 from app.research.crawler import DeepResearchCrawler
 from app.research.expand import LLMQueryExpander, NoopExpander
 from app.research.feedback import (
     negative_terms_from_feedback,
     seeds_from_feedback,
+    seeds_from_portfolio,
 )
 from app.research.relevance import KeywordRelevance, LLMRelevance, PassthroughRelevance
 from app.research.seeds import merge_seeds
@@ -188,12 +189,36 @@ def test_feedback_seeds_and_negatives(session) -> None:
 
     session.add(ExpertFeedback(trend_id=confirmed.id, action="confirm"))
     session.add(ExpertFeedback(trend_id=rejected.id, action="reject"))
+    session.add(
+        CanonicalTrend(
+            id="active-portfolio-trend",
+            title="Circular facade services",
+            status="active",
+        )
+    )
+    session.add(
+        CanonicalTrend(
+            id="rejected-portfolio-trend",
+            title=rejected.title,
+            status="rejected",
+        )
+    )
+    session.commit()
+    session.add(
+        TrendOccurrence(
+            canonical_trend_id="rejected-portfolio-trend",
+            trend_id=rejected.id,
+            run_id=run.id,
+            change_type="unchanged",
+        )
+    )
     session.commit()
 
     seeds = seeds_from_feedback(session)
     assert "Adaptive Facades" in seeds
     assert "facade" in seeds
     assert "Plastic in Blood" not in seeds
+    assert "Circular facade services" in seeds_from_portfolio(session)
 
     negatives = negative_terms_from_feedback(session)
     assert "plastic" in negatives

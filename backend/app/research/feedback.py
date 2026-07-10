@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from sqlmodel import Session, select
 
-from app.models import ExpertFeedback, Topic, Trend
+from app.models import CanonicalTrend, ExpertFeedback, Topic, Trend, TrendOccurrence
 
 
 def _keywords_for_trend(session: Session, trend: Trend, top_n: int = 3) -> list[str]:
@@ -53,6 +53,17 @@ def seeds_from_feedback(session: Session, limit: int = 20) -> list[str]:
     return terms[:limit]
 
 
+def seeds_from_portfolio(session: Session, limit: int = 12) -> list[str]:
+    """Use accepted portfolio identities as context for the next focused crawl."""
+    canonicals = session.exec(
+        select(CanonicalTrend)
+        .where(CanonicalTrend.status == "active")
+        .order_by(CanonicalTrend.updated_at.desc())
+        .limit(limit)
+    ).all()
+    return [trend.title.strip() for trend in canonicals if trend.title.strip()]
+
+
 def negative_terms_from_feedback(session: Session, limit: int = 20) -> list[str]:
     """Derive negative (exclusion) terms from rejected trends."""
     feedbacks = session.exec(
@@ -70,5 +81,23 @@ def negative_terms_from_feedback(session: Session, limit: int = 20) -> list[str]
             if low not in seen:
                 seen.add(low)
                 terms.append(kw)
+
+    rejected = session.exec(
+        select(CanonicalTrend).where(CanonicalTrend.status == "rejected")
+    ).all()
+    for canonical in rejected:
+        occurrence = session.exec(
+            select(TrendOccurrence)
+            .where(TrendOccurrence.canonical_trend_id == canonical.id)
+            .order_by(TrendOccurrence.run_id.desc())
+        ).first()
+        trend = session.get(Trend, occurrence.trend_id) if occurrence else None
+        if trend is None:
+            continue
+        for keyword in _keywords_for_trend(session, trend, top_n=5):
+            low = keyword.lower()
+            if low not in seen:
+                seen.add(low)
+                terms.append(keyword)
 
     return terms[:limit]

@@ -5,8 +5,11 @@ from __future__ import annotations
 from typing import Protocol
 
 import numpy as np
+from sqlmodel import Session, select
 
 from app.llm import get_openai_client
+from app.models import Chunk, Document, DocumentEmbedding
+from app.pipeline.deduplication import content_fingerprint
 
 
 class Embedder(Protocol):
@@ -49,12 +52,19 @@ class SentenceTransformerEmbedder:
     """
 
     def __init__(
-        self, dim: int = 384, model_name: str = "paraphrase-multilingual-MiniLM-L12-v2"
+        self,
+        dim: int = 384,
+        model_name: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+        model_revision: str = "f16484b452bc5449a3ad85665709a2648b51d735",
     ) -> None:
         from sentence_transformers import SentenceTransformer
 
-        self._model = SentenceTransformer(model_name)
+        self._model = SentenceTransformer(model_name, revision=model_revision)
         self.dim = self._model.get_sentence_embedding_dimension()
+        if self.dim != dim:
+            raise ValueError(
+                f"SentenceTransformer dimension {self.dim} does not match configured {dim}"
+            )
 
     def embed(self, texts: list[str]) -> np.ndarray:
         if not texts:
@@ -84,13 +94,91 @@ class OpenAIEmbedder:
         return np.asarray([d.embedding for d in resp.data], dtype=np.float32)
 
 
-def get_embedder(name: str, dim: int) -> Embedder:
+def get_embedder(
+    name: str,
+    dim: int,
+    *,
+    model_name: str | None = None,
+    model_revision: str | None = None,
+) -> Embedder:
     """Factory: resolve an embedder by name."""
     name = name.lower()
     if name == "hashing":
         return HashingEmbedder(dim=dim)
     if name == "sentence_transformers":
-        return SentenceTransformerEmbedder(dim=dim)
+        kwargs = {}
+        if model_name:
+            kwargs["model_name"] = model_name
+        if model_revision:
+            kwargs["model_revision"] = model_revision
+        return SentenceTransformerEmbedder(dim=dim, **kwargs)
     if name == "openai":
         return OpenAIEmbedder(dim=dim)
     raise ValueError(f"Unknown embedder: {name!r}")
+
+
+def embed_documents_cached(
+    session: Session,
+    documents: list[Document],
+    *,
+    embedder: Embedder,
+    model_name: str,
+    model_revision: str,
+) -> np.ndarray:
+    """Reuse embeddings by content hash/model/revision and preserve input ordering."""
+    vectors: dict[int, np.ndarray] = {}
+    missing: list[Document] = []
+    for document in documents:
+        fingerprint = document.content_hash or content_fingerprint(
+            document.title, document.text
+        )
+        if not document.content_hash:
+            document.content_hash = fingerprint
+            session.add(document)
+        cached = session.exec(
+            select(DocumentEmbedding).where(
+                DocumentEmbedding.content_hash == fingerprint,
+                DocumentEmbedding.model_name == model_name,
+                DocumentEmbedding.model_revision == model_revision,
+            )
+        ).first()
+        if cached:
+            vectors[document.id] = np.asarray(cached.embedding, dtype=np.float32)
+        else:
+            missing.append(document)
+
+    if missing:
+        created = embedder.embed([document.text for document in missing])
+        for document, vector in zip(missing, created, strict=True):
+            fingerprint = document.content_hash or content_fingerprint(
+                document.title, document.text
+            )
+            session.add(
+                DocumentEmbedding(
+                    document_id=document.id,
+                    content_hash=fingerprint,
+                    model_name=model_name,
+                    model_revision=model_revision,
+                    embedding=vector.tolist(),
+                )
+            )
+            vectors[document.id] = np.asarray(vector, dtype=np.float32)
+
+    # Chunk remains the compatibility/retrieval store; only create it once.
+    for document in documents:
+        chunk = session.exec(
+            select(Chunk).where(Chunk.document_id == document.id, Chunk.chunk_index == 0)
+        ).first()
+        if not chunk:
+            session.add(
+                Chunk(
+                    document_id=document.id,
+                    chunk_index=0,
+                    text=document.text,
+                    embedding=vectors[document.id].tolist(),
+                )
+            )
+    session.flush()
+    if not documents:
+        return np.zeros((0, embedder.dim), dtype=np.float32)
+    return np.vstack([vectors[document.id] for document in documents])

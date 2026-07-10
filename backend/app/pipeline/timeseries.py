@@ -30,6 +30,49 @@ def build_topic_timepoints(
     return result
 
 
+def complete_quarters(
+    timepoints: dict[str, int], *, max_periods: int | None = None
+) -> dict[str, int]:
+    """Fill missing quarters, optionally limiting the operational analysis window.
+
+    A single old paper must not create decades of zeroes or dominate current growth.
+    ``max_periods`` therefore anchors a rolling window at the latest observation while
+    preserving the original publication dates inside that window.
+    """
+    if not timepoints:
+        return {}
+    first, last = min(timepoints), max(timepoints)
+    year, quarter = int(first[:4]), int(first[-1])
+    end_year, end_quarter = int(last[:4]), int(last[-1])
+    if max_periods is not None:
+        if max_periods < 1:
+            raise ValueError("max_periods must be positive")
+        start_index = end_year * 4 + end_quarter - 1 - (max_periods - 1)
+        window_year, window_quarter_zero = divmod(start_index, 4)
+        window_start = (window_year, window_quarter_zero + 1)
+        if (year, quarter) < window_start:
+            year, quarter = window_start
+    completed: dict[str, int] = {}
+    while (year, quarter) <= (end_year, end_quarter):
+        period = f"{year}-Q{quarter}"
+        completed[period] = timepoints.get(period, 0)
+        quarter += 1
+        if quarter == 5:
+            year, quarter = year + 1, 1
+    return completed
+
+
+def topic_prevalence(
+    topic_counts: dict[str, int], corpus_counts: dict[str, int]
+) -> dict[str, float]:
+    return {
+        period: count / corpus_counts.get(period, 1)
+        if corpus_counts.get(period, 0)
+        else 0.0
+        for period, count in complete_quarters(topic_counts).items()
+    }
+
+
 def growth_ratio(timepoints: dict[str, int]) -> float:
     """Signed recent-vs-older growth ratio of quarterly counts (split at the midpoint).
 
@@ -86,3 +129,14 @@ def classify_maturity(
     if emergence is not None and emergence >= novel_threshold and level == "established":
         return "emerging"
     return level
+
+
+def stabilize_maturity(previous: str | None, proposed: str, *, evidence_count: int) -> str:
+    """Require meaningful evidence before a multi-level maturity jump."""
+    levels = ["weak_signal", "emerging", "established", "megatrend"]
+    if previous not in levels or proposed not in levels:
+        return proposed
+    old, new = levels.index(previous), levels.index(proposed)
+    if abs(new - old) > 1 and evidence_count < 8:
+        return levels[old + (1 if new > old else -1)]
+    return proposed
