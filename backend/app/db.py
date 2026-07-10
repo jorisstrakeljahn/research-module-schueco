@@ -3,9 +3,13 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from pathlib import Path
 
+from alembic.config import Config
 from sqlalchemy import text
-from sqlmodel import Session, SQLModel, create_engine
+from sqlmodel import Session, create_engine
+
+from alembic import command
 
 # Import models so they are registered on SQLModel.metadata before create_all.
 from app import models  # noqa: F401
@@ -22,32 +26,17 @@ def get_engine():
     return _engine
 
 
-# Lightweight, idempotent column additions for tables that predate a model change.
-# The project intentionally uses create_all instead of a migration tool (ADR-16);
-# create_all does not ALTER existing tables, so additive columns are applied here.
-_ADDITIVE_COLUMNS: tuple[tuple[str, str, str], ...] = (
-    ("topic", "region", "VARCHAR"),
-    ("topic", "country", "VARCHAR"),
-    ("run", "error", "VARCHAR"),
-)
-
-
 def init_db() -> None:
-    """Enable the pgvector extension, create all tables, apply additive columns."""
+    """Upgrade the database to the current Alembic revision."""
     engine = get_engine()
     with engine.connect() as conn:
         conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         conn.commit()
-    SQLModel.metadata.create_all(engine)
-    with engine.connect() as conn:
-        for table, column, coltype in _ADDITIVE_COLUMNS:
-            conn.execute(
-                text(
-                    f'ALTER TABLE "{table}" ADD COLUMN IF NOT EXISTS '
-                    f'"{column}" {coltype}'
-                )
-            )
-        conn.commit()
+    backend_dir = Path(__file__).resolve().parents[1]
+    alembic_cfg = Config(str(backend_dir / "alembic.ini"))
+    alembic_cfg.set_main_option("script_location", str(backend_dir / "alembic"))
+    alembic_cfg.set_main_option("sqlalchemy.url", get_settings().database_url)
+    command.upgrade(alembic_cfg, "head")
     _check_embedding_dimension(engine)
 
 

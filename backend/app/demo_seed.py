@@ -30,7 +30,13 @@ def seed_demo_database() -> None:
 
     init_db()
     _truncate_all_tables()
+    # Re-run the idempotent baseline migration after importing the legacy snapshot,
+    # otherwise run 7 did not exist when Alembic first upgraded a fresh database.
+    with get_engine().connect() as conn:
+        conn.execute(text("DELETE FROM alembic_version"))
+        conn.commit()
     _import_sql_file(sql_path)
+    init_db()
 
 
 def _truncate_all_tables() -> None:

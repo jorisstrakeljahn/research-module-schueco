@@ -14,7 +14,7 @@ region- and source-type filtering described in the project plan (§7).
 from datetime import UTC, datetime
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import Column
+from sqlalchemy import Boolean, Column, Float, Integer, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Field, Relationship, SQLModel
 
@@ -40,6 +40,8 @@ SOURCE_TYPES = (
 )
 MATURITY_LEVELS = ("weak_signal", "emerging", "established", "megatrend")
 RADAR_STAGES = ("act", "prepare", "watch")
+PORTFOLIO_STATUSES = ("active", "review", "rejected", "dormant", "merged")
+OCCURRENCE_CHANGES = ("new", "updated", "unchanged", "review")
 
 # The six classic PESTEL macro-environment dimensions (Theobald 2016; Keicher 2022),
 # used as the classification label set (ADR-25). Schüco's Trendradar renders these as
@@ -80,6 +82,18 @@ class Document(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     source_id: int | None = Field(default=None, foreign_key="source.id", index=True)
     external_id: str | None = Field(default=None, index=True)  # for de-duplication
+    doi: str | None = Field(default=None, index=True, unique=True)
+    canonical_url: str | None = Field(default=None, index=True, unique=True)
+    content_hash: str | None = Field(default=None, index=True, unique=True)
+    normalized_identity: str | None = Field(default=None, index=True, unique=True)
+    duplicate_of_id: int | None = Field(default=None, foreign_key="document.id")
+    near_duplicate_of_id: int | None = Field(default=None, foreign_key="document.id")
+    corpus_approved: bool = Field(
+        default=True,
+        sa_column=Column(
+            Boolean, nullable=False, server_default=text("false"), index=True
+        ),
+    )
     title: str
     text: str
     url: str | None = None
@@ -108,6 +122,25 @@ class Chunk(SQLModel, table=True):
     document: Document | None = Relationship(back_populates="chunks")
 
 
+class DocumentEmbedding(SQLModel, table=True):
+    """Reusable whole-document embedding keyed by immutable content and model."""
+
+    __tablename__ = "document_embedding"
+    __table_args__ = (
+        UniqueConstraint(
+            "content_hash", "model_name", "model_revision", name="uq_document_embedding"
+        ),
+    )
+
+    id: int | None = Field(default=None, primary_key=True)
+    document_id: int = Field(foreign_key="document.id", index=True)
+    content_hash: str = Field(index=True)
+    model_name: str
+    model_revision: str = "default"
+    embedding: list[float] = Field(sa_column=Column(Vector(EMBEDDING_DIM)))
+    created_at: datetime = Field(default_factory=_utcnow)
+
+
 class Run(SQLModel, table=True):
     __tablename__ = "run"
 
@@ -119,11 +152,41 @@ class Run(SQLModel, table=True):
     topic_model: str | None = None
     describer: str | None = None
     params: dict | None = Field(default=None, sa_column=Column(JSONB))
+    corpus_hash: str | None = Field(default=None, index=True)
+    corpus_cutoff: datetime | None = None
+    component_manifest: dict | None = Field(default=None, sa_column=Column(JSONB))
+    prompt_manifest: dict | None = Field(default=None, sa_column=Column(JSONB))
+    git_revision: str | None = None
+    embedder_revision: str | None = None
+    topic_model_revision: str | None = None
+    random_seed: int = Field(
+        default=42,
+        sa_column=Column(Integer, nullable=False, server_default=text("42")),
+    )
+    classifier: str | None = None
+    usage_metrics: dict | None = Field(default=None, sa_column=Column(JSONB))
     n_documents: int = 0
     n_topics: int = 0
     error: str | None = None  # populated when status == "failed"
 
     topics: list["Topic"] = Relationship(back_populates="run")
+
+
+class RunEvent(SQLModel, table=True):
+    """Append-only progress event emitted while a pipeline run is executing."""
+
+    __tablename__ = "run_event"
+
+    id: int | None = Field(default=None, primary_key=True)
+    run_id: int = Field(foreign_key="run.id", index=True)
+    phase: str = Field(index=True)
+    progress: int = Field(
+        default=0,
+        sa_column=Column(Integer, nullable=False, server_default=text("0")),
+    )
+    message: str
+    details: dict | None = Field(default=None, sa_column=Column(JSONB))
+    created_at: datetime = Field(default_factory=_utcnow)
 
 
 class Topic(SQLModel, table=True):
@@ -158,6 +221,10 @@ class TopicTimepoint(SQLModel, table=True):
     topic_id: int = Field(foreign_key="topic.id", index=True)
     period: str  # e.g. "2024-Q1"
     doc_count: int = 0
+    prevalence: float = Field(
+        default=0.0,
+        sa_column=Column(Float, nullable=False, server_default=text("0")),
+    )
 
     topic: Topic | None = Relationship(back_populates="timepoints")
 
@@ -244,3 +311,115 @@ class TrendTranslation(SQLModel, table=True):
     summary: str = ""
     rationale: str | None = None
     created_at: datetime = Field(default_factory=_utcnow)
+
+
+class CanonicalTrend(SQLModel, table=True):
+    """Stable portfolio identity; run-specific machine output remains in ``Trend``."""
+
+    __tablename__ = "canonical_trend"
+
+    id: str = Field(primary_key=True)
+    status: str = Field(default="active", index=True)
+    title: str
+    summary: str = ""
+    maturity: str | None = None
+    pestel: list[str] | None = Field(default=None, sa_column=Column(JSONB))
+    category: str | None = None
+    impact: float | None = None
+    urgency: float | None = None
+    uncertainty: float | None = None
+    radar_stage: str | None = None
+    first_run_id: int | None = Field(default=None, foreign_key="run.id", index=True)
+    last_run_id: int | None = Field(default=None, foreign_key="run.id", index=True)
+    merged_into_id: str | None = Field(default=None, foreign_key="canonical_trend.id")
+    created_at: datetime = Field(default_factory=_utcnow)
+    updated_at: datetime = Field(default_factory=_utcnow)
+
+
+class RunDocument(SQLModel, table=True):
+    """Materialized, immutable membership of a run's cumulative corpus."""
+
+    __tablename__ = "run_document"
+    __table_args__ = (UniqueConstraint("run_id", "document_id", name="uq_run_document"),)
+
+    id: int | None = Field(default=None, primary_key=True)
+    run_id: int = Field(foreign_key="run.id", index=True)
+    document_id: int = Field(foreign_key="document.id", index=True)
+    provenance: str  # new | carried_forward
+    position: int
+    topic_index: int | None = Field(default=None, index=True)
+    is_outlier: bool = False
+    membership_probability: float | None = None
+    created_at: datetime = Field(default_factory=_utcnow)
+
+
+class TrendOccurrence(SQLModel, table=True):
+    """One run observation linked to exactly one stable portfolio trend."""
+
+    __tablename__ = "trend_occurrence"
+
+    id: int | None = Field(default=None, primary_key=True)
+    canonical_trend_id: str = Field(foreign_key="canonical_trend.id", index=True)
+    trend_id: int = Field(foreign_key="trend.id", index=True, unique=True)
+    run_id: int = Field(foreign_key="run.id", index=True)
+    change_type: str = Field(index=True)
+    match_score: float | None = None
+    match_margin: float | None = None
+    changed_fields: list[str] | None = Field(default=None, sa_column=Column(JSONB))
+    review_reason: str | None = None
+    prevalence: float | None = None
+    created_at: datetime = Field(default_factory=_utcnow)
+
+
+class TrendDecision(SQLModel, table=True):
+    """Append-only human decision audit trail."""
+
+    __tablename__ = "trend_decision"
+
+    id: int | None = Field(default=None, primary_key=True)
+    canonical_trend_id: str | None = Field(
+        default=None, foreign_key="canonical_trend.id", index=True
+    )
+    occurrence_id: int | None = Field(
+        default=None, foreign_key="trend_occurrence.id", index=True
+    )
+    action: str
+    reviewer: str
+    reason: str | None = None
+    before_values: dict | None = Field(default=None, sa_column=Column(JSONB))
+    after_values: dict | None = Field(default=None, sa_column=Column(JSONB))
+    idempotency_key: str = Field(unique=True, index=True)
+    created_at: datetime = Field(default_factory=_utcnow)
+
+
+class BaselineSnapshot(SQLModel, table=True):
+    __tablename__ = "baseline_snapshot"
+
+    key: str = Field(primary_key=True)
+    title: str
+    source: str
+    source_run_id: int | None = Field(default=None, foreign_key="run.id")
+    created_at: datetime = Field(default_factory=_utcnow)
+
+
+class BaselineTrend(SQLModel, table=True):
+    """Immutable values exactly as accepted for a historical report snapshot."""
+
+    __tablename__ = "baseline_trend"
+    __table_args__ = (
+        UniqueConstraint("snapshot_key", "position", name="uq_baseline_position"),
+        UniqueConstraint("snapshot_key", "legacy_trend_id", name="uq_baseline_legacy"),
+    )
+
+    id: int | None = Field(default=None, primary_key=True)
+    snapshot_key: str = Field(foreign_key="baseline_snapshot.key", index=True)
+    position: int
+    legacy_trend_id: int
+    canonical_trend_id: str | None = Field(
+        default=None, foreign_key="canonical_trend.id", index=True
+    )
+    title: str
+    relevance: float | None = None
+    novelty: str | None = None
+    traceability: float | None = None
+    payload: dict | None = Field(default=None, sa_column=Column(JSONB))
