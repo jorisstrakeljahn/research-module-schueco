@@ -17,6 +17,7 @@ uses an LLM with a fixed JSON schema, grounded in the retrieved evidence (ADR-12
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
 from typing import Protocol
 
@@ -145,15 +146,32 @@ class HeuristicClassifier:
     """Deterministic, offline classifier: lexicon overlap + signal heuristics."""
 
     def _tokens(self, signal: TrendSignal) -> list[str]:
+        evidence = " ".join(
+            str(item.get("title") or "") for item in signal.evidence[:12]
+        )
         text = " ".join(signal.keywords) + " " + signal.title + " " + signal.summary
-        return [t for t in text.lower().replace(",", " ").split() if t]
+        return re.findall(r"[a-z0-9äöüß-]+", f"{text} {evidence}".lower())
 
-    def _pestel(self, tokens: set[str]) -> list[str]:
+    def _pestel(self, tokens: set[str], category: str) -> list[str]:
         scored = {
             dim: len(tokens & terms) for dim, terms in _PESTEL_LEXICON.items()
         }
-        ranked = [d for d, n in sorted(scored.items(), key=lambda x: -x[1]) if n > 0]
-        return ranked[:2] or ["technological"]
+        highest = max(scored.values(), default=0)
+        if highest > 0:
+            threshold = max(1, round(highest * 0.45))
+            return [
+                dimension
+                for dimension, score in sorted(
+                    scored.items(), key=lambda item: (-item[1], item[0])
+                )
+                if score >= threshold
+            ][:3]
+        return {
+            "climate": ["environmental"],
+            "markets": ["economic"],
+            "digital": ["technological"],
+            "technology": ["technological"],
+        }[category]
 
     def _category(self, tokens: set[str]) -> str:
         scored = {
@@ -164,8 +182,8 @@ class HeuristicClassifier:
 
     def classify(self, signal: TrendSignal) -> Classification:
         tokens = set(self._tokens(signal))
-        pestel = self._pestel(tokens)
         category = self._category(tokens)
+        pestel = self._pestel(tokens, category)
 
         # Impact: anchored on maturity, lifted a little by corpus weight (size).
         impact = _MATURITY_IMPACT.get(signal.maturity or "", 5.0)
@@ -220,7 +238,11 @@ class OpenAIClassifier:
             "Classify the trend below using ONLY the evidence and keywords given.\n"
             f"Title: {signal.title}\nKeywords: {', '.join(signal.keywords)}\n"
             f"Summary: {signal.summary}\nEvidence:\n{context}\n\n"
-            f"PESTEL must be one or two of: {', '.join(PESTEL_DIMENSIONS)}.\n"
+            "Evaluate every PESTEL dimension independently against the evidence. "
+            "Do not default to technological or environmental merely because this is "
+            "a building-industry trend, and do not enforce an artificial quota. "
+            f"Return the one to three dimensions with direct support from: "
+            f"{', '.join(PESTEL_DIMENSIONS)}.\n"
             f"Category must be exactly one of: {', '.join(TREND_CATEGORIES)}.\n"
             "Score impact (strategic effect on the building industry) and urgency "
             "(how soon action is needed) and uncertainty (how unpredictable), each an "
@@ -245,7 +267,7 @@ class OpenAIClassifier:
             raw_pestel = data.get("pestel", [])
             if not isinstance(raw_pestel, list):
                 raw_pestel = []
-            pestel = [p for p in raw_pestel if p in PESTEL_DIMENSIONS][:2]
+            pestel = [p for p in raw_pestel if p in PESTEL_DIMENSIONS][:3]
             category = data.get("category")
             if category not in TREND_CATEGORIES:
                 category = base.category
@@ -278,6 +300,14 @@ def get_classifier(name: str) -> TrendClassifier:
     name = name.lower()
     if name in ("heuristic", "offline"):
         return HeuristicClassifier()
+    if name == "auto":
+        from app.config import get_settings
+
+        return (
+            OpenAIClassifier()
+            if get_settings().openai_api_key
+            else HeuristicClassifier()
+        )
     if name == "openai":
         return OpenAIClassifier()
     raise ValueError(f"Unknown classifier: {name!r}")

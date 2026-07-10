@@ -73,6 +73,23 @@ def test_heuristic_classifier_digital_ai():
     assert "technological" in result.pestel
 
 
+def test_heuristic_classifier_uses_evidence_for_broader_pestel_coverage():
+    result = HeuristicClassifier().classify(
+        TrendSignal(
+            keywords=["facade"],
+            title="Adaptive renovation systems",
+            evidence=[
+                {"title": "EU policy incentives and public funding"},
+                {"title": "Market investment and workforce skills"},
+                {"title": "EPBD regulation and compliance standards"},
+            ],
+        )
+    )
+    assert 1 <= len(result.pestel) <= 3
+    assert "political" in result.pestel
+    assert {"economic", "social", "legal"} & set(result.pestel)
+
+
 def test_novel_low_source_trend_is_more_uncertain():
     common = dict(keywords=["facade"], title="Facade", maturity="emerging", size=4)
     certain = HeuristicClassifier().classify(

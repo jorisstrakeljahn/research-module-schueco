@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -18,7 +18,29 @@ class RunOut(BaseModel):
     embedder: str | None
     topic_model: str | None
     describer: str | None
+    params: dict[str, Any] | None = None
     error: str | None = None
+
+
+class RunProgressEventOut(BaseModel):
+    id: int
+    phase: str
+    progress: int
+    message: str
+    details: dict[str, Any] | None = None
+    created_at: datetime
+
+
+class RunProgressOut(BaseModel):
+    run_id: int
+    status: str
+    phase: str
+    progress: int
+    message: str
+    n_documents: int
+    n_topics: int
+    error: str | None = None
+    events: list[RunProgressEventOut] = Field(default_factory=list)
 
 
 class TimepointOut(BaseModel):
@@ -47,16 +69,178 @@ class TrendOut(BaseModel):
 
 class TrendDetailOut(TrendOut):
     rationale: str | None = None
-    evidence: list[dict] = []
-    timeseries: list[TimepointOut] = []
+    evidence: list[dict] = Field(default_factory=list)
+    timeseries: list[TimepointOut] = Field(default_factory=list)
+
+
+PortfolioStatus = Literal["active", "review", "rejected", "dormant", "merged"]
+RunDiffKind = Literal["new", "updated", "unchanged", "review"]
+DecisionAction = Literal["confirm", "correct", "reject", "restore", "link", "create", "merge"]
+
+
+class PortfolioTrendOut(TrendOut):
+    id: str
+    status: PortfolioStatus
+    first_run_id: int | None = None
+    last_run_id: int | None = None
+    merged_into_id: str | None = None
+    occurrence_count: int = 0
+    updated_at: datetime | None = None
+
+
+class TrendEvidenceOut(BaseModel):
+    title: str
+    url: str | None = None
+    source: str | None = None
+    published_at: str | None = None
+    run_id: int | None = None
+
+
+class PortfolioTrendDetailOut(PortfolioTrendOut):
+    rationale: str | None = None
+    evidence: list[TrendEvidenceOut] = Field(default_factory=list)
+    timeseries: list[TimepointOut] = Field(default_factory=list)
+
+
+class PestelDimensionAnalysisOut(BaseModel):
+    dimension: str
+    relevance: float
+    matched_documents: int
+    total_documents: int
+    signal_terms: list[str] = Field(default_factory=list)
+    evidence: list[TrendEvidenceOut] = Field(default_factory=list)
+
+
+class PestelAnalysisOut(BaseModel):
+    trend_id: str
+    run_id: int
+    dimensions: list[PestelDimensionAnalysisOut]
+
+
+class TrendDecisionOut(BaseModel):
+    id: int
+    action: DecisionAction
+    reviewer: str | None
+    reason: str | None = None
+    created_at: datetime
+    before: dict[str, Any] | None = None
+    after: dict[str, Any] | None = None
+
+
+class TrendHistoryPointOut(BaseModel):
+    run_id: int
+    occurred_at: datetime | None = None
+    maturity: str | None = None
+    impact: float | None = None
+    urgency: float | None = None
+    uncertainty: float | None = None
+    emergence: float | None = None
+    size: int = 0
+    change_type: RunDiffKind
+
+
+class TrendHistoryOut(BaseModel):
+    trend_id: str
+    points: list[TrendHistoryPointOut]
+    evidence: list[TrendEvidenceOut]
+    decisions: list[TrendDecisionOut]
+
+
+class RunDiffEntryOut(BaseModel):
+    occurrence_id: int
+    canonical_trend_id: str | None = None
+    trend_id: int | None = None
+    title: str
+    change_type: RunDiffKind
+    match_score: float | None = None
+    margin: float | None = None
+    changed_fields: list[str]
+    before: dict[str, Any] | None = None
+    after: dict[str, Any] | None = None
+
+
+class RunDiffOut(BaseModel):
+    run_id: int
+    started_at: datetime
+    query: str | None = None
+    counts: dict[RunDiffKind, int]
+    entries: list[RunDiffEntryOut]
+
+
+class SuggestedTrendOut(BaseModel):
+    id: str
+    title: str
+    status: PortfolioStatus
+
+
+class ReviewCandidateOut(BaseModel):
+    id: str
+    title: str
+    score: float | None = None
+
+
+class ReviewQueueItemOut(BaseModel):
+    occurrence_id: int
+    run_id: int
+    canonical_trend_id: str | None = None
+    title: str
+    summary: str
+    maturity: str | None = None
+    match_score: float | None = None
+    margin: float | None = None
+    reason: str | None = None
+    suggested_trend: SuggestedTrendOut | None = None
+    candidates: list[ReviewCandidateOut] = Field(default_factory=list)
+
+
+class PortfolioDecisionIn(BaseModel):
+    action: Literal["confirm", "correct", "reject", "restore", "merge"]
+    reviewer: str = Field(min_length=1)
+    reason: str = Field(min_length=1)
+    changes: dict[str, Any] = Field(default_factory=dict)
+    target_trend_id: str | int | None = None
+    idempotency_key: str = Field(min_length=1)
+
+
+class ReviewDecisionIn(BaseModel):
+    action: Literal["link", "create", "reject", "merge"]
+    reviewer: str = Field(min_length=1)
+    reason: str = Field(min_length=1)
+    canonical_trend_id: str | int | None = None
+    target_trend_id: str | int | None = None
+    idempotency_key: str = Field(min_length=1)
 
 
 class RunRequest(BaseModel):
     keywords: list[str] = Field(default=[], max_length=10)
     query: str | None = Field(default=None, max_length=300)
-    limit: int = Field(default=50, ge=1, le=200)
+    limit: int | None = Field(default=None, ge=1, le=200)
     language: Literal["en", "de"] = "en"
     mode: Literal["deep_research", "simple"] = "deep_research"
+    depth: Literal["quick", "standard", "deep"] = "standard"
+    region: Literal[
+        "global", "europe", "dach", "north_america", "asia_pacific", "china"
+    ] = "global"
+    sources: list[
+        Literal["openalex", "arxiv", "firecrawl", "firecrawl_web"]
+    ] = Field(default=[], max_length=4)
+    holistic_pestel: bool = True
+    topic_granularity: Literal["compact", "balanced", "detailed"] = "balanced"
+
+
+class SearchSourceOut(BaseModel):
+    id: str
+    enabled: bool
+    requires_configuration: bool = False
+
+
+class SearchCapabilitiesOut(BaseModel):
+    sources: list[SearchSourceOut]
+    default_sources: list[str]
+    openai_enrichment: bool
+    topic_model: str
+    topic_granularities: list[str]
+    max_documents: int = 200
 
 
 class FeedbackIn(BaseModel):

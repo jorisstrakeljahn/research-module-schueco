@@ -7,7 +7,6 @@ from types import SimpleNamespace
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import event
-from sqlmodel import select
 
 from app.db import get_engine
 from app.main import app
@@ -125,13 +124,11 @@ def test_maturity_filter(client, session):
 
 
 @requires_db
-def test_start_run(client, monkeypatch):
+def test_start_run(client, session, monkeypatch):
     calls: list[tuple] = []
     monkeypatch.setattr(
         "app.api.routes._run_pipeline_bg",
-        lambda keywords, query, limit, language="en", mode="deep_research": calls.append(
-            (keywords, query, limit, language, mode)
-        ),
+        lambda *args: calls.append(args),
     )
 
     ok = client.post(
@@ -141,14 +138,50 @@ def test_start_run(client, monkeypatch):
     assert ok.json()["query"] == "adaptive facade bipv"
     assert ok.json()["language"] == "de"
     assert ok.json()["mode"] == "deep_research"
-    assert calls and calls[0][0] == ["adaptive facade", "bipv"]
-    assert calls[0][4] == "deep_research"
+    assert ok.json()["run_id"] > 0
+    assert calls and calls[0][1] == ["adaptive facade", "bipv"]
+    assert calls[0][5] == "deep_research"
+    progress = client.get(f"/runs/{ok.json()['run_id']}/progress")
+    assert progress.status_code == 200
+    assert progress.json()["phase"] == "queued"
+    assert progress.json()["events"][0]["progress"] == 2
 
     simple = client.post(
         "/runs", json={"keywords": ["facade"], "mode": "simple"}
     )
     assert simple.status_code == 202
     assert simple.json()["mode"] == "simple"
+
+    capabilities = client.get("/search/capabilities")
+    assert capabilities.status_code == 200
+    assert any(
+        source["id"] == "openalex" and source["enabled"]
+        for source in capabilities.json()["sources"]
+    )
+
+    configured = client.post(
+        "/runs",
+        json={
+            "query": "adaptive building envelopes",
+            "keywords": ["vacuum glazing"],
+            "region": "dach",
+            "depth": "deep",
+            "sources": ["openalex", "arxiv"],
+            "topic_granularity": "detailed",
+        },
+    )
+    assert configured.status_code == 202
+    assert configured.json()["query"] == "adaptive building envelopes"
+    assert calls[-1][6:] == (
+        ["openalex", "arxiv"],
+        "dach",
+        "deep",
+        True,
+        "detailed",
+    )
+    configured_run = session.get(Run, configured.json()["run_id"])
+    assert configured_run.params["topic_max"] == 18
+    assert configured_run.params["bertopic_min_cluster_size"] == 5
 
     bad = client.post("/runs", json={"keywords": []})
     assert bad.status_code == 422
@@ -193,13 +226,18 @@ def test_background_failure_leaves_failed_run(session, monkeypatch):
         raise RuntimeError("crawl exploded")
 
     monkeypatch.setattr("app.research.service.run_simple_search", boom)
+    run = Run(status="running", params={"query": "facade", "mode": "simple"})
+    session.add(run)
+    session.commit()
+    session.refresh(run)
 
-    _run_pipeline_bg([], "facade", 10, "en", "simple")
+    _run_pipeline_bg(run.id, [], "facade", 10, "en", "simple")
 
-    runs = session.exec(select(Run).order_by(Run.id.desc())).all()
-    assert runs, "the background task must leave a terminal Run row"
-    assert runs[0].status == "failed"
-    assert runs[0].error
+    session.expire_all()
+    failed = session.get(Run, run.id)
+    assert failed is not None
+    assert failed.status == "failed"
+    assert failed.error
 
 
 @requires_db
