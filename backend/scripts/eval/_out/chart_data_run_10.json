@@ -1,0 +1,1355 @@
+{
+  "run": {
+    "id": 10,
+    "embedder": "sentence_transformers",
+    "topic_model": "bertopic",
+    "describer": "template",
+    "classifier": "heuristic",
+    "n_documents": 69,
+    "n_topics": 2,
+    "corpus_hash": "76338077080a44c25a51bc64dc6c8abf9f63a0dee248d83ad18878dd6f9031ec",
+    "component_manifest": {
+      "packages": {
+        "numpy": "2.4.6",
+        "hdbscan": "0.8.44",
+        "bertopic": "0.17.4",
+        "umap-learn": "0.5.12",
+        "sentence-transformers": "5.5.1"
+      },
+      "embedding": {
+        "name": "sentence_transformers",
+        "model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+        "revision": "f16484b452bc5449a3ad85665709a2648b51d735",
+        "dimension": 384,
+        "normalize": true
+      },
+      "topic_config": {
+        "seed": 42,
+        "umap": {
+          "metric": "cosine",
+          "n_jobs": 1,
+          "min_dist": 0.0,
+          "n_neighbors": 15,
+          "n_components": 5
+        },
+        "hdbscan": {
+          "core_dist_n_jobs": 1,
+          "cluster_selection_method": "eom"
+        },
+        "matching": {
+          "margin": 0.08,
+          "threshold": 0.62,
+          "review_threshold": 0.5
+        },
+        "vectorizer": {
+          "top_n": 8,
+          "stop_words": "english",
+          "ngram_range": [
+            1,
+            2
+          ]
+        },
+        "min_cluster_size": 8
+      }
+    }
+  },
+  "n_trends": 2,
+  "trends": [
+    {
+      "trend_id": 55,
+      "topic_id": 55,
+      "title": "Smart, Building, Energy",
+      "maturity": "megatrend",
+      "emergence": 0.0,
+      "size": 44,
+      "label": "smart, building, energy",
+      "pestel": [
+        "technological",
+        "environmental"
+      ],
+      "category": "climate",
+      "impact": 10.0,
+      "uncertainty": 5.0,
+      "urgency": 8.0,
+      "radar_stage": "act",
+      "timepoints": [
+        {
+          "period": "1977-Q1",
+          "doc_count": 1
+        },
+        {
+          "period": "1977-Q2",
+          "doc_count": 0
+        },
+        {
+          "period": "1977-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "1977-Q4",
+          "doc_count": 0
+        },
+        {
+          "period": "1978-Q1",
+          "doc_count": 0
+        },
+        {
+          "period": "1978-Q2",
+          "doc_count": 0
+        },
+        {
+          "period": "1978-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "1978-Q4",
+          "doc_count": 0
+        },
+        {
+          "period": "1979-Q1",
+          "doc_count": 0
+        },
+        {
+          "period": "1979-Q2",
+          "doc_count": 0
+        },
+        {
+          "period": "1979-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "1979-Q4",
+          "doc_count": 0
+        },
+        {
+          "period": "1980-Q1",
+          "doc_count": 0
+        },
+        {
+          "period": "1980-Q2",
+          "doc_count": 0
+        },
+        {
+          "period": "1980-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "1980-Q4",
+          "doc_count": 0
+        },
+        {
+          "period": "1981-Q1",
+          "doc_count": 0
+        },
+        {
+          "period": "1981-Q2",
+          "doc_count": 0
+        },
+        {
+          "period": "1981-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "1981-Q4",
+          "doc_count": 0
+        },
+        {
+          "period": "1982-Q1",
+          "doc_count": 0
+        },
+        {
+          "period": "1982-Q2",
+          "doc_count": 0
+        },
+        {
+          "period": "1982-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "1982-Q4",
+          "doc_count": 0
+        },
+        {
+          "period": "1983-Q1",
+          "doc_count": 0
+        },
+        {
+          "period": "1983-Q2",
+          "doc_count": 0
+        },
+        {
+          "period": "1983-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "1983-Q4",
+          "doc_count": 0
+        },
+        {
+          "period": "1984-Q1",
+          "doc_count": 0
+        },
+        {
+          "period": "1984-Q2",
+          "doc_count": 0
+        },
+        {
+          "period": "1984-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "1984-Q4",
+          "doc_count": 0
+        },
+        {
+          "period": "1985-Q1",
+          "doc_count": 0
+        },
+        {
+          "period": "1985-Q2",
+          "doc_count": 0
+        },
+        {
+          "period": "1985-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "1985-Q4",
+          "doc_count": 0
+        },
+        {
+          "period": "1986-Q1",
+          "doc_count": 0
+        },
+        {
+          "period": "1986-Q2",
+          "doc_count": 0
+        },
+        {
+          "period": "1986-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "1986-Q4",
+          "doc_count": 0
+        },
+        {
+          "period": "1987-Q1",
+          "doc_count": 0
+        },
+        {
+          "period": "1987-Q2",
+          "doc_count": 0
+        },
+        {
+          "period": "1987-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "1987-Q4",
+          "doc_count": 0
+        },
+        {
+          "period": "1988-Q1",
+          "doc_count": 0
+        },
+        {
+          "period": "1988-Q2",
+          "doc_count": 1
+        },
+        {
+          "period": "1988-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "1988-Q4",
+          "doc_count": 0
+        },
+        {
+          "period": "1989-Q1",
+          "doc_count": 0
+        },
+        {
+          "period": "1989-Q2",
+          "doc_count": 0
+        },
+        {
+          "period": "1989-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "1989-Q4",
+          "doc_count": 2
+        },
+        {
+          "period": "1990-Q1",
+          "doc_count": 0
+        },
+        {
+          "period": "1990-Q2",
+          "doc_count": 0
+        },
+        {
+          "period": "1990-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "1990-Q4",
+          "doc_count": 0
+        },
+        {
+          "period": "1991-Q1",
+          "doc_count": 1
+        },
+        {
+          "period": "1991-Q2",
+          "doc_count": 0
+        },
+        {
+          "period": "1991-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "1991-Q4",
+          "doc_count": 0
+        },
+        {
+          "period": "1992-Q1",
+          "doc_count": 0
+        },
+        {
+          "period": "1992-Q2",
+          "doc_count": 0
+        },
+        {
+          "period": "1992-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "1992-Q4",
+          "doc_count": 0
+        },
+        {
+          "period": "1993-Q1",
+          "doc_count": 0
+        },
+        {
+          "period": "1993-Q2",
+          "doc_count": 1
+        },
+        {
+          "period": "1993-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "1993-Q4",
+          "doc_count": 0
+        },
+        {
+          "period": "1994-Q1",
+          "doc_count": 0
+        },
+        {
+          "period": "1994-Q2",
+          "doc_count": 0
+        },
+        {
+          "period": "1994-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "1994-Q4",
+          "doc_count": 0
+        },
+        {
+          "period": "1995-Q1",
+          "doc_count": 1
+        },
+        {
+          "period": "1995-Q2",
+          "doc_count": 0
+        },
+        {
+          "period": "1995-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "1995-Q4",
+          "doc_count": 0
+        },
+        {
+          "period": "1996-Q1",
+          "doc_count": 0
+        },
+        {
+          "period": "1996-Q2",
+          "doc_count": 0
+        },
+        {
+          "period": "1996-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "1996-Q4",
+          "doc_count": 0
+        },
+        {
+          "period": "1997-Q1",
+          "doc_count": 0
+        },
+        {
+          "period": "1997-Q2",
+          "doc_count": 0
+        },
+        {
+          "period": "1997-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "1997-Q4",
+          "doc_count": 0
+        },
+        {
+          "period": "1998-Q1",
+          "doc_count": 0
+        },
+        {
+          "period": "1998-Q2",
+          "doc_count": 1
+        },
+        {
+          "period": "1998-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "1998-Q4",
+          "doc_count": 0
+        },
+        {
+          "period": "1999-Q1",
+          "doc_count": 1
+        },
+        {
+          "period": "1999-Q2",
+          "doc_count": 0
+        },
+        {
+          "period": "1999-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "1999-Q4",
+          "doc_count": 0
+        },
+        {
+          "period": "2000-Q1",
+          "doc_count": 0
+        },
+        {
+          "period": "2000-Q2",
+          "doc_count": 0
+        },
+        {
+          "period": "2000-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "2000-Q4",
+          "doc_count": 0
+        },
+        {
+          "period": "2001-Q1",
+          "doc_count": 0
+        },
+        {
+          "period": "2001-Q2",
+          "doc_count": 0
+        },
+        {
+          "period": "2001-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "2001-Q4",
+          "doc_count": 0
+        },
+        {
+          "period": "2002-Q1",
+          "doc_count": 0
+        },
+        {
+          "period": "2002-Q2",
+          "doc_count": 0
+        },
+        {
+          "period": "2002-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "2002-Q4",
+          "doc_count": 1
+        },
+        {
+          "period": "2003-Q1",
+          "doc_count": 0
+        },
+        {
+          "period": "2003-Q2",
+          "doc_count": 0
+        },
+        {
+          "period": "2003-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "2003-Q4",
+          "doc_count": 0
+        },
+        {
+          "period": "2004-Q1",
+          "doc_count": 0
+        },
+        {
+          "period": "2004-Q2",
+          "doc_count": 0
+        },
+        {
+          "period": "2004-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "2004-Q4",
+          "doc_count": 1
+        },
+        {
+          "period": "2005-Q1",
+          "doc_count": 0
+        },
+        {
+          "period": "2005-Q2",
+          "doc_count": 1
+        },
+        {
+          "period": "2005-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "2005-Q4",
+          "doc_count": 0
+        },
+        {
+          "period": "2006-Q1",
+          "doc_count": 0
+        },
+        {
+          "period": "2006-Q2",
+          "doc_count": 0
+        },
+        {
+          "period": "2006-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "2006-Q4",
+          "doc_count": 0
+        },
+        {
+          "period": "2007-Q1",
+          "doc_count": 2
+        },
+        {
+          "period": "2007-Q2",
+          "doc_count": 0
+        },
+        {
+          "period": "2007-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "2007-Q4",
+          "doc_count": 0
+        },
+        {
+          "period": "2008-Q1",
+          "doc_count": 1
+        },
+        {
+          "period": "2008-Q2",
+          "doc_count": 0
+        },
+        {
+          "period": "2008-Q3",
+          "doc_count": 1
+        },
+        {
+          "period": "2008-Q4",
+          "doc_count": 1
+        },
+        {
+          "period": "2009-Q1",
+          "doc_count": 2
+        },
+        {
+          "period": "2009-Q2",
+          "doc_count": 0
+        },
+        {
+          "period": "2009-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "2009-Q4",
+          "doc_count": 0
+        },
+        {
+          "period": "2010-Q1",
+          "doc_count": 1
+        },
+        {
+          "period": "2010-Q2",
+          "doc_count": 0
+        },
+        {
+          "period": "2010-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "2010-Q4",
+          "doc_count": 0
+        },
+        {
+          "period": "2011-Q1",
+          "doc_count": 1
+        },
+        {
+          "period": "2011-Q2",
+          "doc_count": 2
+        },
+        {
+          "period": "2011-Q3",
+          "doc_count": 1
+        },
+        {
+          "period": "2011-Q4",
+          "doc_count": 1
+        },
+        {
+          "period": "2012-Q1",
+          "doc_count": 1
+        },
+        {
+          "period": "2012-Q2",
+          "doc_count": 0
+        },
+        {
+          "period": "2012-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "2012-Q4",
+          "doc_count": 0
+        },
+        {
+          "period": "2013-Q1",
+          "doc_count": 1
+        },
+        {
+          "period": "2013-Q2",
+          "doc_count": 1
+        },
+        {
+          "period": "2013-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "2013-Q4",
+          "doc_count": 0
+        },
+        {
+          "period": "2014-Q1",
+          "doc_count": 0
+        },
+        {
+          "period": "2014-Q2",
+          "doc_count": 0
+        },
+        {
+          "period": "2014-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "2014-Q4",
+          "doc_count": 0
+        },
+        {
+          "period": "2015-Q1",
+          "doc_count": 0
+        },
+        {
+          "period": "2015-Q2",
+          "doc_count": 1
+        },
+        {
+          "period": "2015-Q3",
+          "doc_count": 1
+        },
+        {
+          "period": "2015-Q4",
+          "doc_count": 1
+        },
+        {
+          "period": "2016-Q1",
+          "doc_count": 1
+        },
+        {
+          "period": "2016-Q2",
+          "doc_count": 0
+        },
+        {
+          "period": "2016-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "2016-Q4",
+          "doc_count": 1
+        },
+        {
+          "period": "2017-Q1",
+          "doc_count": 0
+        },
+        {
+          "period": "2017-Q2",
+          "doc_count": 0
+        },
+        {
+          "period": "2017-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "2017-Q4",
+          "doc_count": 0
+        },
+        {
+          "period": "2018-Q1",
+          "doc_count": 0
+        },
+        {
+          "period": "2018-Q2",
+          "doc_count": 1
+        },
+        {
+          "period": "2018-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "2018-Q4",
+          "doc_count": 0
+        },
+        {
+          "period": "2019-Q1",
+          "doc_count": 0
+        },
+        {
+          "period": "2019-Q2",
+          "doc_count": 1
+        },
+        {
+          "period": "2019-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "2019-Q4",
+          "doc_count": 1
+        },
+        {
+          "period": "2020-Q1",
+          "doc_count": 0
+        },
+        {
+          "period": "2020-Q2",
+          "doc_count": 1
+        },
+        {
+          "period": "2020-Q3",
+          "doc_count": 1
+        },
+        {
+          "period": "2020-Q4",
+          "doc_count": 0
+        },
+        {
+          "period": "2021-Q1",
+          "doc_count": 0
+        },
+        {
+          "period": "2021-Q2",
+          "doc_count": 0
+        },
+        {
+          "period": "2021-Q3",
+          "doc_count": 1
+        },
+        {
+          "period": "2021-Q4",
+          "doc_count": 0
+        },
+        {
+          "period": "2022-Q1",
+          "doc_count": 2
+        },
+        {
+          "period": "2022-Q2",
+          "doc_count": 1
+        },
+        {
+          "period": "2022-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "2022-Q4",
+          "doc_count": 1
+        },
+        {
+          "period": "2023-Q1",
+          "doc_count": 0
+        },
+        {
+          "period": "2023-Q2",
+          "doc_count": 0
+        },
+        {
+          "period": "2023-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "2023-Q4",
+          "doc_count": 1
+        }
+      ]
+    },
+    {
+      "trend_id": 56,
+      "topic_id": 56,
+      "title": "Building, Review, Smart",
+      "maturity": "megatrend",
+      "emergence": 0.0,
+      "size": 25,
+      "label": "building, review, smart",
+      "pestel": [
+        "technological",
+        "environmental"
+      ],
+      "category": "technology",
+      "impact": 10.0,
+      "uncertainty": 5.0,
+      "urgency": 8.0,
+      "radar_stage": "act",
+      "timepoints": [
+        {
+          "period": "1993-Q2",
+          "doc_count": 1
+        },
+        {
+          "period": "1993-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "1993-Q4",
+          "doc_count": 0
+        },
+        {
+          "period": "1994-Q1",
+          "doc_count": 0
+        },
+        {
+          "period": "1994-Q2",
+          "doc_count": 0
+        },
+        {
+          "period": "1994-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "1994-Q4",
+          "doc_count": 0
+        },
+        {
+          "period": "1995-Q1",
+          "doc_count": 0
+        },
+        {
+          "period": "1995-Q2",
+          "doc_count": 0
+        },
+        {
+          "period": "1995-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "1995-Q4",
+          "doc_count": 0
+        },
+        {
+          "period": "1996-Q1",
+          "doc_count": 0
+        },
+        {
+          "period": "1996-Q2",
+          "doc_count": 0
+        },
+        {
+          "period": "1996-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "1996-Q4",
+          "doc_count": 0
+        },
+        {
+          "period": "1997-Q1",
+          "doc_count": 0
+        },
+        {
+          "period": "1997-Q2",
+          "doc_count": 0
+        },
+        {
+          "period": "1997-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "1997-Q4",
+          "doc_count": 0
+        },
+        {
+          "period": "1998-Q1",
+          "doc_count": 0
+        },
+        {
+          "period": "1998-Q2",
+          "doc_count": 0
+        },
+        {
+          "period": "1998-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "1998-Q4",
+          "doc_count": 0
+        },
+        {
+          "period": "1999-Q1",
+          "doc_count": 0
+        },
+        {
+          "period": "1999-Q2",
+          "doc_count": 0
+        },
+        {
+          "period": "1999-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "1999-Q4",
+          "doc_count": 0
+        },
+        {
+          "period": "2000-Q1",
+          "doc_count": 0
+        },
+        {
+          "period": "2000-Q2",
+          "doc_count": 0
+        },
+        {
+          "period": "2000-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "2000-Q4",
+          "doc_count": 0
+        },
+        {
+          "period": "2001-Q1",
+          "doc_count": 1
+        },
+        {
+          "period": "2001-Q2",
+          "doc_count": 0
+        },
+        {
+          "period": "2001-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "2001-Q4",
+          "doc_count": 0
+        },
+        {
+          "period": "2002-Q1",
+          "doc_count": 0
+        },
+        {
+          "period": "2002-Q2",
+          "doc_count": 0
+        },
+        {
+          "period": "2002-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "2002-Q4",
+          "doc_count": 0
+        },
+        {
+          "period": "2003-Q1",
+          "doc_count": 0
+        },
+        {
+          "period": "2003-Q2",
+          "doc_count": 0
+        },
+        {
+          "period": "2003-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "2003-Q4",
+          "doc_count": 0
+        },
+        {
+          "period": "2004-Q1",
+          "doc_count": 0
+        },
+        {
+          "period": "2004-Q2",
+          "doc_count": 0
+        },
+        {
+          "period": "2004-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "2004-Q4",
+          "doc_count": 0
+        },
+        {
+          "period": "2005-Q1",
+          "doc_count": 0
+        },
+        {
+          "period": "2005-Q2",
+          "doc_count": 0
+        },
+        {
+          "period": "2005-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "2005-Q4",
+          "doc_count": 0
+        },
+        {
+          "period": "2006-Q1",
+          "doc_count": 0
+        },
+        {
+          "period": "2006-Q2",
+          "doc_count": 0
+        },
+        {
+          "period": "2006-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "2006-Q4",
+          "doc_count": 0
+        },
+        {
+          "period": "2007-Q1",
+          "doc_count": 0
+        },
+        {
+          "period": "2007-Q2",
+          "doc_count": 0
+        },
+        {
+          "period": "2007-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "2007-Q4",
+          "doc_count": 0
+        },
+        {
+          "period": "2008-Q1",
+          "doc_count": 1
+        },
+        {
+          "period": "2008-Q2",
+          "doc_count": 0
+        },
+        {
+          "period": "2008-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "2008-Q4",
+          "doc_count": 0
+        },
+        {
+          "period": "2009-Q1",
+          "doc_count": 0
+        },
+        {
+          "period": "2009-Q2",
+          "doc_count": 0
+        },
+        {
+          "period": "2009-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "2009-Q4",
+          "doc_count": 0
+        },
+        {
+          "period": "2010-Q1",
+          "doc_count": 0
+        },
+        {
+          "period": "2010-Q2",
+          "doc_count": 0
+        },
+        {
+          "period": "2010-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "2010-Q4",
+          "doc_count": 0
+        },
+        {
+          "period": "2011-Q1",
+          "doc_count": 0
+        },
+        {
+          "period": "2011-Q2",
+          "doc_count": 0
+        },
+        {
+          "period": "2011-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "2011-Q4",
+          "doc_count": 0
+        },
+        {
+          "period": "2012-Q1",
+          "doc_count": 1
+        },
+        {
+          "period": "2012-Q2",
+          "doc_count": 0
+        },
+        {
+          "period": "2012-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "2012-Q4",
+          "doc_count": 3
+        },
+        {
+          "period": "2013-Q1",
+          "doc_count": 0
+        },
+        {
+          "period": "2013-Q2",
+          "doc_count": 0
+        },
+        {
+          "period": "2013-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "2013-Q4",
+          "doc_count": 1
+        },
+        {
+          "period": "2014-Q1",
+          "doc_count": 1
+        },
+        {
+          "period": "2014-Q2",
+          "doc_count": 0
+        },
+        {
+          "period": "2014-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "2014-Q4",
+          "doc_count": 0
+        },
+        {
+          "period": "2015-Q1",
+          "doc_count": 0
+        },
+        {
+          "period": "2015-Q2",
+          "doc_count": 0
+        },
+        {
+          "period": "2015-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "2015-Q4",
+          "doc_count": 0
+        },
+        {
+          "period": "2016-Q1",
+          "doc_count": 1
+        },
+        {
+          "period": "2016-Q2",
+          "doc_count": 0
+        },
+        {
+          "period": "2016-Q3",
+          "doc_count": 1
+        },
+        {
+          "period": "2016-Q4",
+          "doc_count": 0
+        },
+        {
+          "period": "2017-Q1",
+          "doc_count": 2
+        },
+        {
+          "period": "2017-Q2",
+          "doc_count": 1
+        },
+        {
+          "period": "2017-Q3",
+          "doc_count": 1
+        },
+        {
+          "period": "2017-Q4",
+          "doc_count": 0
+        },
+        {
+          "period": "2018-Q1",
+          "doc_count": 0
+        },
+        {
+          "period": "2018-Q2",
+          "doc_count": 1
+        },
+        {
+          "period": "2018-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "2018-Q4",
+          "doc_count": 0
+        },
+        {
+          "period": "2019-Q1",
+          "doc_count": 1
+        },
+        {
+          "period": "2019-Q2",
+          "doc_count": 1
+        },
+        {
+          "period": "2019-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "2019-Q4",
+          "doc_count": 0
+        },
+        {
+          "period": "2020-Q1",
+          "doc_count": 0
+        },
+        {
+          "period": "2020-Q2",
+          "doc_count": 0
+        },
+        {
+          "period": "2020-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "2020-Q4",
+          "doc_count": 1
+        },
+        {
+          "period": "2021-Q1",
+          "doc_count": 0
+        },
+        {
+          "period": "2021-Q2",
+          "doc_count": 1
+        },
+        {
+          "period": "2021-Q3",
+          "doc_count": 2
+        },
+        {
+          "period": "2021-Q4",
+          "doc_count": 0
+        },
+        {
+          "period": "2022-Q1",
+          "doc_count": 1
+        },
+        {
+          "period": "2022-Q2",
+          "doc_count": 0
+        },
+        {
+          "period": "2022-Q3",
+          "doc_count": 0
+        },
+        {
+          "period": "2022-Q4",
+          "doc_count": 0
+        },
+        {
+          "period": "2023-Q1",
+          "doc_count": 1
+        },
+        {
+          "period": "2023-Q2",
+          "doc_count": 0
+        },
+        {
+          "period": "2023-Q3",
+          "doc_count": 1
+        }
+      ]
+    }
+  ],
+  "distributions": {
+    "maturity": {
+      "megatrend": 2
+    },
+    "pestel": {
+      "technological": 2,
+      "environmental": 2
+    },
+    "radar_stage": {
+      "act": 2
+    },
+    "category": {
+      "climate": 1,
+      "technology": 1
+    }
+  }
+}

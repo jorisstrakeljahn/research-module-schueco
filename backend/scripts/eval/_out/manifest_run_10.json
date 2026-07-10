@@ -1,0 +1,70 @@
+{
+  "run_id": 10,
+  "corpus_hash": "76338077080a44c25a51bc64dc6c8abf9f63a0dee248d83ad18878dd6f9031ec",
+  "n_documents": 69,
+  "n_new_documents": 0,
+  "n_carried_forward": 69,
+  "source_distribution": {
+    "OpenAlex": 69
+  },
+  "funnel": {
+    "topics": 2,
+    "new": 0,
+    "updated": 0,
+    "unchanged": 2,
+    "review": 0
+  },
+  "configuration": {
+    "embedder": "sentence_transformers",
+    "embedder_revision": "f16484b452bc5449a3ad85665709a2648b51d735",
+    "topic_model": "bertopic",
+    "topic_model_revision": "bertopic-deterministic-v1",
+    "random_seed": 42,
+    "component_manifest": {
+      "packages": {
+        "numpy": "2.4.6",
+        "hdbscan": "0.8.44",
+        "bertopic": "0.17.4",
+        "umap-learn": "0.5.12",
+        "sentence-transformers": "5.5.1"
+      },
+      "embedding": {
+        "name": "sentence_transformers",
+        "model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+        "revision": "f16484b452bc5449a3ad85665709a2648b51d735",
+        "dimension": 384,
+        "normalize": true
+      },
+      "topic_config": {
+        "seed": 42,
+        "umap": {
+          "metric": "cosine",
+          "n_jobs": 1,
+          "min_dist": 0.0,
+          "n_neighbors": 15,
+          "n_components": 5
+        },
+        "hdbscan": {
+          "core_dist_n_jobs": 1,
+          "cluster_selection_method": "eom"
+        },
+        "matching": {
+          "margin": 0.08,
+          "threshold": 0.62,
+          "review_threshold": 0.5
+        },
+        "vectorizer": {
+          "top_n": 8,
+          "stop_words": "english",
+          "ngram_range": [
+            1,
+            2
+          ]
+        },
+        "min_cluster_size": 8
+      }
+    },
+    "prompt_manifest": {},
+    "git_revision": "cbad948ba301b27c4bfe6acd9ef284dce9121bed"
+  }
+}
