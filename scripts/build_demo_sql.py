@@ -23,6 +23,8 @@ KEEP_TABLES = frozenset(
         "source",
         "document",
         "run",
+        "run_event",
+        "run_document",
         "topic",
         "topic_timepoint",
         "trend",
@@ -30,6 +32,11 @@ KEEP_TABLES = frozenset(
         "expert_feedback",
         "reference_trend",
         "trend_translation",
+        "canonical_trend",
+        "trend_occurrence",
+        "trend_decision",
+        "baseline_snapshot",
+        "baseline_trend",
     }
 )
 
