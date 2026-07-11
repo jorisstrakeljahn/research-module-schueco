@@ -1,21 +1,79 @@
 "use client";
 
-import { Loader2, X } from "lucide-react";
-import { useState } from "react";
+import { ChevronDown, Loader2, X } from "lucide-react";
+import { useEffect, useState } from "react";
 
-import { startRun, type RunMode } from "@/lib/api";
+import {
+  fetchSearchCapabilities,
+  startRun,
+  type RunMode,
+  type SearchCapabilities,
+} from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
+import {
+  readSearchPreferences,
+  type ResearchDepth,
+  type SearchRegion,
+  type TopicGranularity,
+} from "@/lib/search-preferences";
+
+const REGIONS: SearchRegion[] = [
+  "global",
+  "europe",
+  "dach",
+  "north_america",
+  "asia_pacific",
+  "china",
+];
+
+const DEPTHS: ResearchDepth[] = ["quick", "standard", "deep"];
+const FOCUS_SUGGESTIONS = {
+  de: ["EPBD & Regulierung", "Kreislaufwirtschaft", "Digitale Gebäudehülle"],
+  en: ["EPBD & regulation", "Circular economy", "Digital building envelope"],
+};
 
 export default function TrendSearch({
   onStarted,
+  onError,
 }: {
-  onStarted?: (query: string) => void;
+  onStarted?: (result: {
+    run_id: number;
+    query: string;
+    language: string;
+    mode: RunMode;
+  }) => void;
+  onError?: (error: string) => void;
 }) {
   const { t, lang } = useI18n();
+  const [query, setQuery] = useState("");
   const [keywords, setKeywords] = useState<string[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
-  const [mode, setMode] = useState<RunMode>("deep_research");
+  const [depth, setDepth] = useState<ResearchDepth>("standard");
+  const [region, setRegion] = useState<SearchRegion>("global");
+  const [topicGranularity, setTopicGranularity] =
+    useState<TopicGranularity>("balanced");
+  const [sources, setSources] = useState<string[]>([]);
+  const [capabilities, setCapabilities] = useState<SearchCapabilities | null>(null);
+
+  useEffect(() => {
+    async function loadPreferences() {
+      const preferences = readSearchPreferences();
+      try {
+        const data = await fetchSearchCapabilities();
+        setCapabilities(data);
+        const allowed = new Set(data.sources.filter((source) => source.enabled).map((source) => source.id));
+        const preferred = preferences.sources.filter((source) => allowed.has(source));
+        setSources(preferred.length > 0 ? preferred : data.default_sources);
+      } catch {
+        setCapabilities(null);
+      }
+      setDepth(preferences.depth);
+      setRegion(preferences.region);
+      setTopicGranularity(preferences.topicGranularity);
+    }
+    loadPreferences();
+  }, []);
 
   function addKeyword(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === "Enter" && input.trim()) {
@@ -27,14 +85,25 @@ export default function TrendSearch({
   }
 
   async function search() {
-    if (keywords.length === 0 || busy) return;
+    if (!query.trim() || busy) return;
+    const mode: RunMode = depth === "quick" ? "simple" : "deep_research";
     setBusy(true);
     try {
-      const { query } = await startRun(keywords, lang, mode);
-      onStarted?.(query);
+      const result = await startRun({
+        query: query.trim(),
+        keywords,
+        language: lang,
+        mode,
+        depth,
+        region,
+        sources,
+        topic_granularity: topicGranularity,
+      });
+      onStarted?.(result);
+      setQuery("");
       setKeywords([]);
     } catch (e) {
-      onStarted?.(`__error__:${String(e)}`);
+      onError?.(String(e));
     } finally {
       setBusy(false);
     }
@@ -48,18 +117,20 @@ export default function TrendSearch({
       <div className="mt-4 flex flex-col gap-3 sm:flex-row">
         <input
           type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={addKeyword}
-          placeholder={t("search.placeholder")}
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") search();
+          }}
+          placeholder={t("search.queryPlaceholder")}
           disabled={busy}
           className="flex-1 rounded-lg border border-border bg-bg px-4 py-2.5 text-sm text-fg placeholder-faint focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
         />
         <button
           onClick={search}
-          disabled={keywords.length === 0 || busy}
+          disabled={!query.trim() || busy}
           className={`flex items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-sm font-medium transition-colors ${
-            keywords.length === 0 || busy
+            !query.trim() || busy
               ? "cursor-not-allowed bg-surface-2 text-faint"
               : "bg-primary text-white hover:bg-primary-bright"
           }`}
@@ -69,35 +140,113 @@ export default function TrendSearch({
         </button>
       </div>
 
-      <div className="mt-3 flex items-center gap-3">
-        <div className="inline-flex rounded-lg border border-border bg-bg p-0.5">
-          {(["deep_research", "simple"] as RunMode[]).map((m) => (
+      <div className="mt-4 grid gap-3 md:grid-cols-[1fr_1.35fr]">
+        <label className="grid gap-1.5">
+          <span className="text-xs font-medium text-muted">{t("search.region")}</span>
+          <select
+            value={region}
+            onChange={(event) => setRegion(event.target.value as SearchRegion)}
+            disabled={busy}
+            className="h-10 rounded-lg border border-border bg-bg px-3 text-sm text-fg outline-none focus:border-primary"
+          >
+            {REGIONS.map((value) => (
+              <option key={value} value={value}>
+                {t(`search.region.${value}`)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <div className="grid gap-1.5">
+          <span className="text-xs font-medium text-muted">{t("search.depth")}</span>
+          <div className="grid grid-cols-3 rounded-lg border border-border bg-bg p-0.5">
+            {DEPTHS.map((value) => (
             <button
-              key={m}
+              key={value}
               type="button"
-              onClick={() => setMode(m)}
+              onClick={() => setDepth(value)}
               disabled={busy}
-              className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
-                mode === m
+              className={`rounded-md px-3 py-2 text-xs font-medium transition-colors ${
+                depth === value
                   ? "bg-surface text-fg shadow-sm"
                   : "text-muted hover:text-fg"
               }`}
             >
-              {t(m === "deep_research" ? "search.modeDeep" : "search.modeSimple")}
+              {t(`search.depth.${value}`)}
             </button>
           ))}
+          </div>
+          <p className="text-[11px] text-faint">{t(`search.depthHint.${depth}`)}</p>
         </div>
-        <span className="text-xs text-muted">
-          {t(
-            mode === "deep_research"
-              ? "search.modeDeepHint"
-              : "search.modeSimpleHint",
-          )}
-        </span>
       </div>
 
-      {keywords.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-1.5">
+      <details className="group mt-4 border-t border-border pt-3">
+        <summary className="flex cursor-pointer list-none items-center justify-between text-xs font-medium text-muted">
+          <span>{t("search.advanced")}</span>
+          <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
+        </summary>
+        <div className="mt-3 grid gap-4 md:grid-cols-2">
+          <div>
+            <label className="text-xs font-medium text-muted">{t("search.focusTerms")}</label>
+            <input
+              type="text"
+              value={input}
+              onChange={(event) => setInput(event.target.value)}
+              onKeyDown={addKeyword}
+              placeholder={t("search.focusPlaceholder")}
+              disabled={busy}
+              className="mt-1.5 h-10 w-full rounded-lg border border-border bg-bg px-3 text-sm text-fg outline-none focus:border-primary"
+            />
+            <p className="mt-1 text-[11px] text-faint">{t("search.focusHint")}</p>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {FOCUS_SUGGESTIONS[lang].map((suggestion) => (
+                <button
+                  key={suggestion}
+                  type="button"
+                  disabled={busy || keywords.includes(suggestion)}
+                  onClick={() => setKeywords((current) => [...current, suggestion])}
+                  className="rounded-full border border-border px-2.5 py-1 text-[11px] text-muted transition-colors hover:border-primary hover:text-primary disabled:opacity-40"
+                >
+                  + {suggestion}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <p className="text-xs font-medium text-muted">{t("search.sources")}</p>
+            <div className="mt-1.5 grid grid-cols-2 gap-2">
+              {capabilities?.sources.map((source) => (
+                <label
+                  key={source.id}
+                  className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs ${
+                    source.enabled ? "border-border text-fg" : "border-border/60 text-faint"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={sources.includes(source.id)}
+                    disabled={
+                      !source.enabled ||
+                      busy ||
+                      (sources.includes(source.id) && sources.length === 1)
+                    }
+                    onChange={(event) =>
+                      setSources((current) =>
+                        event.target.checked
+                          ? [...current, source.id]
+                          : current.filter((item) => item !== source.id),
+                      )
+                    }
+                    className="accent-primary"
+                  />
+                  <span>{t(`search.source.${source.id}`)}</span>
+                </label>
+              ))}
+            </div>
+            <p className="mt-1 text-[11px] text-faint">{t("search.sourcesHint")}</p>
+          </div>
+        </div>
+        {keywords.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-1.5">
           {keywords.map((k) => (
             <span
               key={k}
@@ -114,8 +263,9 @@ export default function TrendSearch({
               </button>
             </span>
           ))}
-        </div>
-      )}
+          </div>
+        )}
+      </details>
     </div>
   );
 }
