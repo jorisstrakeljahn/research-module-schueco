@@ -1,99 +1,140 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import PageHeader from "@/components/PageHeader";
+import SearchProgressModal, {
+  SearchProgressPill,
+} from "@/components/SearchProgressModal";
 import TrendSearch from "@/components/TrendSearch";
 import {
+  fetchPortfolioTrends,
+  fetchRunDiff,
+  fetchRunProgress,
   fetchRuns,
-  fetchTrends,
   MATURITY_META,
   MATURITY_ORDER,
   PESTEL_SECTORS,
   type Run,
+  type RunDiff,
+  type RunMode,
+  type RunProgress,
   type Trend,
 } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 
 export default function DashboardPage() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const [trends, setTrends] = useState<Trend[]>([]);
   const [run, setRun] = useState<Run | null>(null);
+  const [runDiff, setRunDiff] = useState<RunDiff | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [activeRunId, setActiveRunId] = useState<number | null>(null);
+  const [activeQuery, setActiveQuery] = useState("");
+  const [activeMode, setActiveMode] = useState<RunMode>("deep_research");
+  const [runProgress, setRunProgress] = useState<RunProgress | null>(null);
+  const [activeDiff, setActiveDiff] = useState<RunDiff | null>(null);
+  const [progressOpen, setProgressOpen] = useState(false);
+  const terminalHandledRef = useRef<number | null>(null);
 
-  function reload() {
-    fetchTrends().then(setTrends).catch((e) => setError(String(e)));
-    fetchRuns().then((r) => setRun(r[0] ?? null)).catch(() => setRun(null));
-  }
+  const reload = useCallback(() => {
+    fetchPortfolioTrends("active").then(setTrends).catch((e) => setError(String(e)));
+    fetchRuns()
+      .then((runs) => {
+        const latest = runs[0] ?? null;
+        setRun(latest);
+        if (latest) fetchRunDiff(latest.id).then(setRunDiff).catch(() => setRunDiff(null));
+      })
+      .catch(() => setRun(null));
+  }, []);
 
   useEffect(() => {
-    Promise.all([fetchTrends(), fetchRuns()])
+    Promise.all([fetchPortfolioTrends("active"), fetchRuns()])
       .then(([trendList, runs]) => {
         setTrends(trendList);
-        setRun(runs[0] ?? null);
+        const latest = runs[0] ?? null;
+        setRun(latest);
+        if (latest) fetchRunDiff(latest.id).then(setRunDiff).catch(() => setRunDiff(null));
       })
       .catch((e) => setError(String(e)))
       .finally(() => setLoading(false));
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
-    };
   }, []);
 
-  async function handleStarted(query: string) {
-    if (query.startsWith("__error__:")) {
-      toast.error(t("search.toastErrorTitle"), {
-        description: query.replace("__error__:", ""),
-      });
-      return;
-    }
-    // Fetch the baseline fresh at click time so an early click (before the initial
-    // fetchRuns resolves) cannot mistake an old completed run for a new result.
-    let baselineId = run?.id ?? 0;
-    try {
-      baselineId = (await fetchRuns(1))[0]?.id ?? 0;
-    } catch {
-      /* fall back to the possibly-stale state id */
-    }
-    toast.success(t("search.toastStartTitle"), {
-      description: t("search.toastStartDesc", { query }),
-    });
-    let tries = 0;
-    if (pollRef.current) clearInterval(pollRef.current);
-    pollRef.current = setInterval(async () => {
-      tries += 1;
+  useEffect(() => {
+    if (activeRunId == null) return;
+    const runId = activeRunId;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    async function poll() {
       try {
-        const runs = await fetchRuns(1);
-        const latest = runs[0];
-        if (latest && latest.id > baselineId && latest.status === "completed") {
-          if (pollRef.current) clearInterval(pollRef.current);
-          reload();
-          toast.success(t("search.toastDoneTitle"), {
-            description: t("search.toastDoneDesc", {
-              topics: latest.n_topics,
-              docs: latest.n_documents,
-            }),
-          });
-          return;
-        }
-        if (latest && latest.id > baselineId && latest.status === "failed") {
-          if (pollRef.current) clearInterval(pollRef.current);
-          toast.error(t("search.toastFailedTitle"), {
-            description: latest.error ?? "",
-          });
+        const next = await fetchRunProgress(runId);
+        if (cancelled) return;
+        setRunProgress(next);
+        const terminal = next.status === "completed" || next.status === "failed";
+        if (terminal) {
+          if (terminalHandledRef.current !== runId) {
+            terminalHandledRef.current = runId;
+            if (next.status === "completed") {
+              const diff = await fetchRunDiff(runId);
+              if (cancelled) return;
+              setActiveDiff(diff);
+              reload();
+              toast.success(t("search.toastDoneTitle"), {
+                description: t("search.toastDoneDesc", {
+                  topics: next.n_topics,
+                  docs: next.n_documents,
+                }),
+              });
+            } else {
+              toast.error(t("search.toastFailedTitle"), {
+                description: next.error ?? "",
+              });
+            }
+          }
           return;
         }
       } catch {
-        /* keep polling */
+        /* transient API failure; keep polling the background run */
       }
-      if (tries >= 90 && pollRef.current) {
-        clearInterval(pollRef.current);
-        toast.info(t("search.toastTimeout"));
-      }
-    }, 4000);
+      if (!cancelled) timer = setTimeout(poll, 1200);
+    }
+
+    poll();
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [activeRunId, reload, t]);
+
+  function handleStarted(result: {
+    run_id: number;
+    query: string;
+    mode: RunMode;
+  }) {
+    terminalHandledRef.current = null;
+    setActiveRunId(result.run_id);
+    setActiveQuery(result.query);
+    setActiveMode(result.mode);
+    setActiveDiff(null);
+    setRunProgress({
+      run_id: result.run_id,
+      status: "running",
+      phase: "queued",
+      progress: 2,
+      message: "",
+      n_documents: 0,
+      n_topics: 0,
+      error: null,
+      events: [],
+    });
+    setProgressOpen(true);
+    toast.success(t("search.toastStartTitle"), {
+      description: t("search.toastStartDesc", { query: result.query }),
+    });
   }
 
   const maturityCounts = useMemo(() => {
@@ -123,7 +164,12 @@ export default function DashboardPage() {
       ) : (
         <div className="flex-1 overflow-auto">
           <div className="mx-auto max-w-5xl space-y-6 p-6">
-            <TrendSearch onStarted={handleStarted} />
+            <TrendSearch
+              onStarted={handleStarted}
+              onError={(message) =>
+                toast.error(t("search.toastErrorTitle"), { description: message })
+              }
+            />
 
       <div className="grid grid-cols-2 gap-4">
         <KpiCard value={trends.length} label={t("dashboard.kpi.total")} />
@@ -155,6 +201,25 @@ export default function DashboardPage() {
         </Panel>
       </div>
 
+      {runDiff && (
+        <Panel title={t("dashboard.panel.lastDiff")}>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {(["new", "updated", "unchanged", "review"] as const).map((kind) => (
+              <Link
+                key={kind}
+                href={`/runs/${runDiff.run_id}`}
+                className="rounded-lg bg-surface-2 p-3 transition-colors hover:bg-hover"
+              >
+                <div className="text-xl font-semibold tabular-nums text-fg">
+                  {runDiff.counts[kind] ?? 0}
+                </div>
+                <div className="mt-1 text-xs text-muted">{t(`diff.${kind}`)}</div>
+              </Link>
+            ))}
+          </div>
+        </Panel>
+      )}
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <QuickLink
           href="/newsfeed"
@@ -172,7 +237,14 @@ export default function DashboardPage() {
 
             {run && (
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-faint">
-                <span>{t("dashboard.runMeta", { id: run.id })}</span>
+                <span>
+                  {t("dashboard.runMeta", {
+                    date: new Intl.DateTimeFormat(lang, {
+                      dateStyle: "medium",
+                      timeStyle: "short",
+                    }).format(new Date(run.started_at)),
+                  })}
+                </span>
                 <span>
                   {t("dashboard.runStats", {
                     docs: run.n_documents,
@@ -183,6 +255,24 @@ export default function DashboardPage() {
             )}
           </div>
         </div>
+      )}
+      {runProgress && (
+        <>
+          <SearchProgressModal
+            open={progressOpen}
+            query={activeQuery}
+            mode={activeMode}
+            progress={runProgress}
+            diff={activeDiff}
+            onClose={() => setProgressOpen(false)}
+          />
+          {!progressOpen && (
+            <SearchProgressPill
+              progress={runProgress}
+              onClick={() => setProgressOpen(true)}
+            />
+          )}
+        </>
       )}
     </div>
   );
