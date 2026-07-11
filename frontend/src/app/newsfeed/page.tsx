@@ -7,10 +7,10 @@ import FilterPanel from "@/components/FilterPanel";
 import PageHeader from "@/components/PageHeader";
 import TrendCard from "@/components/TrendCard";
 import {
-  fetchTrends,
+  decidePortfolioTrend,
+  fetchPortfolioTrends,
   MATURITY_META,
   MATURITY_ORDER,
-  sendFeedback,
   type Maturity,
   type Trend,
 } from "@/lib/api";
@@ -26,7 +26,7 @@ export default function NewsfeedPage() {
   const [pestel, setPestel] = useState<string[]>([]);
 
   useEffect(() => {
-    fetchTrends()
+    fetchPortfolioTrends("active")
       .then(setTrends)
       .catch((e) => setError(String(e)))
       .finally(() => setLoading(false));
@@ -41,19 +41,19 @@ export default function NewsfeedPage() {
     [trends, pestel],
   );
 
-  async function reclassify(trendId: number, newMaturity: Maturity) {
-    const trend = trends.find((t) => t.id === trendId);
+  async function reclassify(trendId: string, newMaturity: Maturity) {
+    const trend = trends.find((t) => String(t.id) === trendId);
     if (!trend || trend.maturity === newMaturity) return;
     const old = trend.maturity;
     setTrends((prev) =>
-      prev.map((t) => (t.id === trendId ? { ...t, maturity: newMaturity } : t)),
+      prev.map((t) => (String(t.id) === trendId ? { ...t, maturity: newMaturity } : t)),
     );
     try {
-      await sendFeedback(trendId, {
+      await decidePortfolioTrend(trendId, {
         action: "correct",
-        field: "maturity",
-        old_value: old ?? undefined,
-        new_value: newMaturity,
+        reviewer: "newsfeed-ui",
+        reason: `Maturity changed from ${old ?? "unset"} to ${newMaturity} via newsfeed`,
+        changes: { maturity: newMaturity },
       });
       toast.success(t("newsfeed.toastReclass"), {
         description: t("newsfeed.toastReclassDesc", {
@@ -63,7 +63,7 @@ export default function NewsfeedPage() {
       });
     } catch (e) {
       setTrends((prev) =>
-        prev.map((tr) => (tr.id === trendId ? { ...tr, maturity: old } : tr)),
+        prev.map((tr) => (String(tr.id) === trendId ? { ...tr, maturity: old } : tr)),
       );
       toast.error(t("newsfeed.toastSaveError"), { description: String(e) });
     }
@@ -101,7 +101,7 @@ export default function NewsfeedPage() {
                   onDrop={(e) => {
                     e.preventDefault();
                     setDragOver(null);
-                    const id = Number(e.dataTransfer.getData("text/plain"));
+                    const id = e.dataTransfer.getData("text/plain");
                     if (id) reclassify(id, m);
                   }}
                   className="flex flex-col"

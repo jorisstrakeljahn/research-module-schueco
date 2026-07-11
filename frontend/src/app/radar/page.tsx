@@ -6,7 +6,12 @@ import FilterPanel from "@/components/FilterPanel";
 import PageHeader from "@/components/PageHeader";
 import TrendDetailPanel from "@/components/TrendDetailPanel";
 import TrendRadar from "@/components/TrendRadar";
-import { fetchTrends, MATURITY_ORDER, type Maturity, type Trend } from "@/lib/api";
+import {
+  fetchPortfolioTrends,
+  MATURITY_ORDER,
+  type Maturity,
+  type Trend,
+} from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 
 export default function RadarPage() {
@@ -20,7 +25,7 @@ export default function RadarPage() {
   const [region, setRegion] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchTrends()
+    fetchPortfolioTrends("active")
       .then(setTrends)
       .catch((e) => setError(String(e)))
       .finally(() => setLoading(false));

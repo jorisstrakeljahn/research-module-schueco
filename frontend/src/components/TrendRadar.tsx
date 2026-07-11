@@ -36,8 +36,13 @@ function polar(angleDeg: number, radius: number): { x: number; y: number } {
   return { x: C + radius * Math.cos(a), y: C + radius * Math.sin(a) };
 }
 
-function jitter(id: number, salt: number): number {
-  const v = Math.sin(id * 12.9898 + salt * 78.233) * 43758.5453;
+function idSeed(id: string | number): number {
+  if (typeof id === "number") return id;
+  return Array.from(id).reduce((sum, char) => (sum * 31 + char.charCodeAt(0)) >>> 0, 7);
+}
+
+function jitter(id: string | number, salt: number): number {
+  const v = Math.sin(idSeed(id) * 12.9898 + salt * 78.233) * 43758.5453;
   return v - Math.floor(v);
 }
 
@@ -79,7 +84,7 @@ export default function TrendRadar({
   onSelect,
 }: {
   trends: Trend[];
-  selectedId?: number | null;
+  selectedId?: string | number | null;
   onSelect?: (t: Trend) => void;
 }) {
   const { t } = useI18n();

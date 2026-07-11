@@ -176,7 +176,7 @@ export default function TrendDetailPage() {
         </ol>
       </Section>
 
-          <FeedbackPanel trendId={trend.id} currentMaturity={trend.maturity} />
+          <FeedbackPanel trendId={trendId} currentMaturity={trend.maturity} />
         </article>
       </div>
     </div>

@@ -3,12 +3,7 @@
 export const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE ?? "http://127.0.0.1:8000";
 
-const API_TOKEN = process.env.NEXT_PUBLIC_API_TOKEN ?? "";
-
-// Bearer header for state-changing requests. Empty token = no header (local dev).
-function authHeaders(): Record<string, string> {
-  return API_TOKEN ? { Authorization: `Bearer ${API_TOKEN}` } : {};
-}
+const BFF_BASE = "/api/backend";
 
 export type Maturity =
   | "weak_signal"
@@ -17,8 +12,8 @@ export type Maturity =
   | "megatrend";
 
 export interface Trend {
-  id: number;
-  run_id: number;
+  id: string | number;
+  run_id: number | null;
   title: string;
   summary: string;
   maturity: Maturity | null;
@@ -46,6 +41,80 @@ export interface TrendDetail extends Trend {
   timeseries: Timepoint[];
 }
 
+export type PortfolioStatus =
+  | "active"
+  | "review"
+  | "rejected"
+  | "dormant"
+  | "merged";
+
+export interface PortfolioTrend extends Trend {
+  status: PortfolioStatus;
+  first_run_id: number | null;
+  last_run_id: number | null;
+  merged_into_id: string | number | null;
+  occurrence_count?: number;
+  updated_at?: string | null;
+}
+
+export interface TrendEvidence {
+  title: string;
+  url: string | null;
+  source?: string | null;
+  published_at?: string | null;
+  run_id?: number | null;
+}
+
+export interface TrendDecision {
+  id: string | number;
+  action: "confirm" | "correct" | "reject" | "restore" | "link" | "create" | "merge";
+  reviewer: string | null;
+  reason: string | null;
+  created_at: string;
+  before?: Record<string, unknown> | null;
+  after?: Record<string, unknown> | null;
+}
+
+export interface TrendHistoryPoint {
+  run_id: number;
+  occurred_at?: string | null;
+  maturity: Maturity | null;
+  impact: number | null;
+  urgency: number | null;
+  uncertainty: number | null;
+  emergence: number | null;
+  size?: number;
+  change_type?: RunDiffKind;
+}
+
+export interface TrendHistory {
+  trend_id: string | number;
+  points: TrendHistoryPoint[];
+  evidence: TrendEvidence[];
+  decisions: TrendDecision[];
+}
+
+export interface PortfolioTrendDetail extends PortfolioTrend {
+  rationale: string | null;
+  evidence: TrendEvidence[];
+  timeseries: Timepoint[];
+}
+
+export interface PestelDimensionAnalysis {
+  dimension: string;
+  relevance: number;
+  matched_documents: number;
+  total_documents: number;
+  signal_terms: string[];
+  evidence: TrendEvidence[];
+}
+
+export interface PestelAnalysis {
+  trend_id: string;
+  run_id: number;
+  dimensions: PestelDimensionAnalysis[];
+}
+
 export interface Run {
   id: number;
   status: string;
@@ -56,13 +125,114 @@ export interface Run {
   embedder: string | null;
   topic_model: string | null;
   describer: string | null;
+  params: Record<string, unknown> | null;
   error: string | null;
+}
+
+export interface RunProgressEvent {
+  id: number;
+  phase: string;
+  progress: number;
+  message: string;
+  details: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export interface RunProgress {
+  run_id: number;
+  status: string;
+  phase: string;
+  progress: number;
+  message: string;
+  n_documents: number;
+  n_topics: number;
+  error: string | null;
+  events: RunProgressEvent[];
+}
+
+export interface SearchSourceCapability {
+  id: string;
+  enabled: boolean;
+  requires_configuration: boolean;
+}
+
+export interface SearchCapabilities {
+  sources: SearchSourceCapability[];
+  default_sources: string[];
+  openai_enrichment: boolean;
+  topic_model: string;
+  topic_granularities: string[];
+  max_documents: number;
+}
+
+export type RunDiffKind = "new" | "updated" | "unchanged" | "review";
+
+export interface RunDiffEntry {
+  occurrence_id: string | number;
+  canonical_trend_id: string | number | null;
+  trend_id?: string | number | null;
+  title: string;
+  change_type: RunDiffKind;
+  match_score: number | null;
+  margin: number | null;
+  changed_fields: string[];
+  before?: Record<string, unknown> | null;
+  after?: Record<string, unknown> | null;
+}
+
+export interface RunDiff {
+  run_id: number;
+  started_at: string;
+  query: string | null;
+  counts: Record<RunDiffKind, number>;
+  entries: RunDiffEntry[];
+}
+
+export interface ReviewQueueItem {
+  occurrence_id: string | number;
+  run_id: number;
+  canonical_trend_id: string | number | null;
+  title: string;
+  summary: string;
+  maturity: Maturity | null;
+  match_score: number | null;
+  margin: number | null;
+  reason: string | null;
+  suggested_trend?: Pick<PortfolioTrend, "id" | "title" | "status"> | null;
+  candidates?: Array<{
+    id: string | number;
+    title: string;
+    score: number | null;
+  }>;
+}
+
+export interface PortfolioDecisionInput {
+  action: "confirm" | "correct" | "reject" | "restore" | "merge";
+  reviewer: string;
+  reason: string;
+  changes?: Record<string, unknown>;
+  target_trend_id?: string | number;
+  idempotency_key?: string;
+}
+
+export interface ReviewDecisionInput {
+  action: "link" | "create" | "reject" | "merge";
+  reviewer: string;
+  reason: string;
+  canonical_trend_id?: string | number;
+  target_trend_id?: string | number;
+  idempotency_key?: string;
 }
 
 async function getJSON<T>(path: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, { cache: "no-store" });
   if (!res.ok) throw new Error(`API ${path} failed: ${res.status}`);
   return res.json() as Promise<T>;
+}
+
+function listFrom<T>(payload: T[] | { items?: T[]; trends?: T[]; runs?: T[] }): T[] {
+  if (Array.isArray(payload)) return payload;
+  return payload.items ?? payload.trends ?? payload.runs ?? [];
 }
 
 export function fetchTrends(maturity?: string): Promise<Trend[]> {
@@ -75,23 +245,90 @@ export function fetchTrend(id: number): Promise<TrendDetail> {
 }
 
 export function fetchRuns(limit = 20): Promise<Run[]> {
-  return getJSON<Run[]>(`/runs?limit=${limit}`);
+  return getJSON<Run[] | { items?: Run[]; runs?: Run[] }>(`/runs?limit=${limit}`).then(
+    listFrom,
+  );
+}
+
+export function fetchSearchCapabilities(): Promise<SearchCapabilities> {
+  return getJSON<SearchCapabilities>("/search/capabilities");
+}
+
+export function fetchPortfolioTrends(status = "active"): Promise<PortfolioTrend[]> {
+  const query = status ? `?status=${encodeURIComponent(status)}` : "";
+  return getJSON<
+    PortfolioTrend[] | { items?: PortfolioTrend[]; trends?: PortfolioTrend[] }
+  >(`/portfolio/trends${query}`).then(listFrom);
+}
+
+export function fetchPortfolioTrend(id: string | number): Promise<PortfolioTrendDetail> {
+  return getJSON<PortfolioTrendDetail>(`/portfolio/trends/${encodeURIComponent(id)}`);
+}
+
+export function fetchPestelAnalysis(id: string | number): Promise<PestelAnalysis> {
+  return getJSON<PestelAnalysis>(
+    `/portfolio/trends/${encodeURIComponent(id)}/pestel-analysis`,
+  );
+}
+
+export function fetchTrendHistory(id: string | number): Promise<TrendHistory> {
+  return getJSON<TrendHistory>(
+    `/portfolio/trends/${encodeURIComponent(id)}/history`,
+  );
+}
+
+export function fetchRunDiff(id: number): Promise<RunDiff> {
+  return getJSON<RunDiff>(`/runs/${id}/diff`);
+}
+
+export function fetchRunProgress(id: number): Promise<RunProgress> {
+  return getJSON<RunProgress>(`/runs/${id}/progress`);
+}
+
+export function fetchReviewQueue(): Promise<ReviewQueueItem[]> {
+  return getJSON<ReviewQueueItem[] | { items?: ReviewQueueItem[] }>("/review-queue").then(
+    listFrom,
+  );
+}
+
+async function mutate<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${BFF_BASE}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const detail = await res.text();
+    throw new Error(detail || `Mutation ${path} failed: ${res.status}`);
+  }
+  if (res.status === 204) return undefined as T;
+  return res.json() as Promise<T>;
 }
 
 export type RunMode = "deep_research" | "simple";
 
 export async function startRun(
-  keywords: string[],
-  language: "de" | "en" = "en",
-  mode: RunMode = "deep_research",
-): Promise<{ query: string; language: string; mode: RunMode }> {
-  const res = await fetch(`${API_BASE}/runs`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...authHeaders() },
-    body: JSON.stringify({ keywords, language, mode }),
+  input: {
+    query: string;
+    keywords?: string[];
+    language?: "de" | "en";
+    mode?: RunMode;
+    depth?: "quick" | "standard" | "deep";
+    region?: string;
+    sources?: string[];
+    topic_granularity?: "compact" | "balanced" | "detailed";
+  },
+): Promise<{
+  run_id: number;
+  query: string;
+  language: string;
+  mode: RunMode;
+  started_at: string;
+}> {
+  return mutate("/runs", {
+    ...input,
+    holistic_pestel: true,
   });
-  if (!res.ok) throw new Error(`Start run failed: ${res.status}`);
-  return res.json();
 }
 
 export async function translateTrend(
@@ -103,13 +340,7 @@ export async function translateTrend(
   summary: string;
   rationale: string | null;
 }> {
-  const res = await fetch(`${API_BASE}/trends/${trendId}/translate`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...authHeaders() },
-    body: JSON.stringify({ language }),
-  });
-  if (!res.ok) throw new Error(`Translate failed: ${res.status}`);
-  return res.json();
+  return mutate(`/trends/${trendId}/translate`, { language });
 }
 
 export async function sendFeedback(
@@ -122,12 +353,27 @@ export async function sendFeedback(
     comment?: string;
   },
 ): Promise<void> {
-  const res = await fetch(`${API_BASE}/trends/${trendId}/feedback`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...authHeaders() },
-    body: JSON.stringify(body),
+  await mutate(`/trends/${trendId}/feedback`, body);
+}
+
+export function decidePortfolioTrend(
+  trendId: string | number,
+  body: PortfolioDecisionInput,
+): Promise<TrendDecision> {
+  return mutate(`/portfolio/trends/${encodeURIComponent(trendId)}/decisions`, {
+    ...body,
+    idempotency_key: body.idempotency_key ?? crypto.randomUUID(),
   });
-  if (!res.ok) throw new Error(`Feedback failed: ${res.status}`);
+}
+
+export function decideReviewItem(
+  occurrenceId: string | number,
+  body: ReviewDecisionInput,
+): Promise<TrendDecision> {
+  return mutate(`/review-queue/${encodeURIComponent(occurrenceId)}/decision`, {
+    ...body,
+    idempotency_key: body.idempotency_key ?? crypto.randomUUID(),
+  });
 }
 
 // Maturity colours (Schüco green ramp, darkest = most mature). `color` is a hex

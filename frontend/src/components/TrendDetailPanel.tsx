@@ -76,7 +76,7 @@ export default function TrendDetailPanel({
           </Field>
 
           <Link
-            href={`/trends/${trend.id}?from=radar`}
+            href={`/portfolio/${trend.id}`}
             className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-3 text-white transition-colors hover:bg-primary-bright"
           >
             {t("detail.fullDetails")} <ArrowUpRight className="h-4 w-4" />
