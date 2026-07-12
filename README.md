@@ -71,6 +71,7 @@ docker compose up -d db
 cd backend
 uv sync
 cp .env.example .env
+uv run alembic upgrade head
 uv run trendscout seed-demo   # loads data/demo.sql (~50 trends)
 uv run trendscout serve       # API on :8000
 
@@ -80,8 +81,8 @@ npm install
 npm run dev                   # UI on :3000
 ```
 
-Open http://localhost:3000 — Dashboard, Newsfeed and Trendradar show the demo trends
-from the latest completed run.
+Open http://localhost:3000 — Dashboard, Portfolio and Trendradar show the persistent
+trend portfolio. Run history, diffs and review decisions remain traceable separately.
 
 To regenerate your own data instead, skip `seed-demo` and run the pipeline:
 
@@ -94,7 +95,14 @@ Maintainers can refresh the snapshot after a good pipeline run:
 
 ```bash
 ./scripts/export-demo.sh
+cd backend
+uv run python scripts/eval/parse_snapshot.py --run-id <id>
+uv run python scripts/eval/topic_comparison.py --run-id <id>
 ```
+
+The evaluator accepts only runs with an explicit `run_document` corpus snapshot.
+Legacy Run 7 remains the immutable expert-evaluation baseline and is deliberately
+not reinterpreted as a reproducible BERTopic run.
 
 ### Troubleshooting
 
@@ -129,14 +137,16 @@ uv run ruff check .
 ## Configuration
 
 Copy `backend/.env.example` to `backend/.env`; secrets (LLM / Firecrawl keys) live in
-`.env` only. Switch from the offline fallbacks to the scientific components:
+`.env` only. Sentence-Transformer embeddings and BERTopic are the application defaults;
+tests explicitly select the deterministic offline fallbacks. Optional services are enabled
+by adding their server-side credentials:
 
 ```bash
 uv sync --extra ml --extra llm
-# then in .env:
-#   EMBEDDER=sentence_transformers  TOPIC_MODEL=bertopic
-#   DESCRIBER=openai  CLASSIFIER=openai
-#   SOURCES=openalex,arxiv,firecrawl
+# then in backend/.env:
+#   FIRECRAWL_API_KEY=...
+#   OPENAI_API_KEY=...
+#   DESCRIBER=openai  CLASSIFIER=openai  EXPANDER=openai
 ```
 
 ## Layout
