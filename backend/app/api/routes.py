@@ -76,11 +76,6 @@ DEPTH_PROFILES = {
     "standard": {"limit": 100, "rounds": 2, "per_query": 15},
     "deep": {"limit": 200, "rounds": 3, "per_query": 25},
 }
-TOPIC_GRANULARITY_PROFILES = {
-    "compact": {"topic_max": 8, "min_cluster_size": 12},
-    "balanced": {"topic_max": 12, "min_cluster_size": 8},
-    "detailed": {"topic_max": 18, "min_cluster_size": 5},
-}
 
 
 def require_token(authorization: str | None = Header(default=None)) -> None:
@@ -107,7 +102,6 @@ def _run_pipeline_bg(
     region: str = "global",
     depth: str = "deep",
     holistic_pestel: bool = True,
-    topic_granularity: str = "balanced",
 ) -> None:
     """Execute a pipeline run in the background, with its own DB session.
 
@@ -127,13 +121,8 @@ def _run_pipeline_bg(
             return
         progress = callback_for_run(run_id)
         profile = DEPTH_PROFILES[depth]
-        topic_profile = TOPIC_GRANULARITY_PROFILES[topic_granularity]
-        settings = get_settings().model_copy(
-            update={
-                "topic_max": topic_profile["topic_max"],
-                "bertopic_min_cluster_size": topic_profile["min_cluster_size"],
-            }
-        )
+        # Topic granularity comes from the env (TOPIC_MAX / BERTOPIC_MIN_CLUSTER_SIZE).
+        settings = get_settings()
         connectors = build_connectors(sources, settings)
         try:
             if mode == "simple":
@@ -473,7 +462,6 @@ def search_capabilities() -> SearchCapabilitiesOut:
         default_sources=default_sources,
         openai_enrichment=bool(settings.openai_api_key),
         topic_model=settings.topic_model,
-        topic_granularities=list(TOPIC_GRANULARITY_PROFILES),
     )
 
 
@@ -572,7 +560,6 @@ def start_run(
     mode = body.mode
     settings = get_settings()
     profile = DEPTH_PROFILES[body.depth]
-    topic_profile = TOPIC_GRANULARITY_PROFILES[body.topic_granularity]
     limit = body.limit or profile["limit"]
     available_sources = {"openalex", "arxiv"}
     if settings.firecrawl_api_key:
@@ -587,16 +574,10 @@ def start_run(
             status_code=422,
             detail=f"Sources are not configured: {', '.join(unavailable)}",
         )
-    run_settings = settings.model_copy(
-        update={
-            "topic_max": topic_profile["topic_max"],
-            "bertopic_min_cluster_size": topic_profile["min_cluster_size"],
-        }
-    )
     run = create_run(
         session,
         query=query,
-        settings=run_settings,
+        settings=settings,
         limit=limit,
         run_params={
             "mode": mode,
@@ -606,9 +587,8 @@ def start_run(
             "region": body.region,
             "depth": body.depth,
             "holistic_pestel": body.holistic_pestel,
-            "topic_granularity": body.topic_granularity,
-            "topic_max": topic_profile["topic_max"],
-            "bertopic_min_cluster_size": topic_profile["min_cluster_size"],
+            "topic_max": settings.topic_max,
+            "bertopic_min_cluster_size": settings.bertopic_min_cluster_size,
             "max_docs": limit,
             "max_rounds": profile["rounds"],
             "per_query_limit": profile["per_query"],
@@ -639,7 +619,6 @@ def start_run(
         body.region,
         body.depth,
         body.holistic_pestel,
-        body.topic_granularity,
     )
     return {
         "status": "started",

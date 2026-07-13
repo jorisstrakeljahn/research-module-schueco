@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     # Pipeline component selection (see .env.example for options)
     embedder: str = "sentence_transformers"
     topic_model: str = "bertopic"
-    topic_max: int = 12  # upper bound on number of topics/clusters per run
+    topic_max: int = 18  # upper bound on number of topics/clusters per run
     describer: str = "template"
     classifier: str = "auto"  # PESTEL/impact assessment: auto | heuristic | openai
     translator: str = "auto"  # on-demand DE/EN translation: auto | openai | none
@@ -36,7 +36,7 @@ class Settings(BaseSettings):
     embedder_revision: str = "f16484b452bc5449a3ad85665709a2648b51d735"
     topic_model_revision: str = "bertopic-adaptive-v2"
     random_seed: int = 42
-    bertopic_min_cluster_size: int = 8
+    bertopic_min_cluster_size: int = 5
     timeseries_max_quarters: int = 24
     match_threshold: float = 0.62
     match_review_threshold: float = 0.50

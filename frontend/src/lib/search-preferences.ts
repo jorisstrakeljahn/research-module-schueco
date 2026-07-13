@@ -7,7 +7,6 @@ export type SearchRegion =
   | "china";
 
 export type ResearchDepth = "quick" | "standard" | "deep";
-export type TopicGranularity = "compact" | "balanced" | "detailed";
 
 export interface SearchPreferences {
   region: SearchRegion;
@@ -16,7 +15,6 @@ export interface SearchPreferences {
   /** Source ids that were available when the preferences were saved. Lets the UI
    * auto-enable sources that became available later (e.g. new API key). */
   knownSources?: string[];
-  topicGranularity: TopicGranularity;
 }
 
 const STORAGE_KEY = "trendscout-search-preferences-v2";
@@ -31,7 +29,6 @@ export const DEFAULT_SEARCH_PREFERENCES: SearchPreferences = {
   region: "global",
   depth: "deep",
   sources: [...ALL_SEARCH_SOURCES],
-  topicGranularity: "balanced",
 };
 
 export function readSearchPreferences(): SearchPreferences {
@@ -47,8 +44,6 @@ export function readSearchPreferences(): SearchPreferences {
       knownSources: Array.isArray(value.knownSources)
         ? value.knownSources
         : undefined,
-      topicGranularity:
-        value.topicGranularity ?? DEFAULT_SEARCH_PREFERENCES.topicGranularity,
     };
   } catch {
     return DEFAULT_SEARCH_PREFERENCES;

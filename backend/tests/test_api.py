@@ -167,7 +167,6 @@ def test_start_run(client, session, monkeypatch):
             "region": "dach",
             "depth": "deep",
             "sources": ["openalex", "arxiv"],
-            "topic_granularity": "detailed",
         },
     )
     assert configured.status_code == 202
@@ -177,11 +176,17 @@ def test_start_run(client, session, monkeypatch):
         "dach",
         "deep",
         True,
-        "detailed",
     )
     configured_run = session.get(Run, configured.json()["run_id"])
-    assert configured_run.params["topic_max"] == 18
-    assert configured_run.params["bertopic_min_cluster_size"] == 5
+    # Topic granularity is env-driven now (TOPIC_MAX / BERTOPIC_MIN_CLUSTER_SIZE).
+    from app.config import get_settings
+
+    settings = get_settings()
+    assert configured_run.params["topic_max"] == settings.topic_max
+    assert (
+        configured_run.params["bertopic_min_cluster_size"]
+        == settings.bertopic_min_cluster_size
+    )
 
     bad = client.post("/runs", json={"keywords": []})
     assert bad.status_code == 422

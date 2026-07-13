@@ -165,7 +165,6 @@ export interface SearchCapabilities {
   default_sources: string[];
   openai_enrichment: boolean;
   topic_model: string;
-  topic_granularities: string[];
   max_documents: number;
 }
 
@@ -371,7 +370,6 @@ export async function startRun(
     depth?: "quick" | "standard" | "deep";
     region?: string;
     sources?: string[];
-    topic_granularity?: "compact" | "balanced" | "detailed";
   },
 ): Promise<{
   run_id: number;

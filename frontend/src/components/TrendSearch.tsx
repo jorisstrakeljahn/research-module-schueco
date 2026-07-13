@@ -16,7 +16,6 @@ import {
   writeSearchPreferences,
   type ResearchDepth,
   type SearchRegion,
-  type TopicGranularity,
 } from "@/lib/search-preferences";
 
 const REGIONS: SearchRegion[] = [
@@ -73,8 +72,6 @@ export default function TrendSearch({
   const [busy, setBusy] = useState(false);
   const [depth, setDepth] = useState<ResearchDepth>(DEFAULT_SEARCH_PREFERENCES.depth);
   const [region, setRegion] = useState<SearchRegion>(DEFAULT_SEARCH_PREFERENCES.region);
-  const [topicGranularity, setTopicGranularity] =
-    useState<TopicGranularity>(DEFAULT_SEARCH_PREFERENCES.topicGranularity);
   const [sources, setSources] = useState<string[]>(DEFAULT_SEARCH_PREFERENCES.sources);
   const [capabilities, setCapabilities] = useState<SearchCapabilities | null>(null);
 
@@ -108,7 +105,6 @@ export default function TrendSearch({
       }
       setDepth(preferences.depth);
       setRegion(preferences.region);
-      setTopicGranularity(preferences.topicGranularity);
     }
     loadPreferences();
   }, []);
@@ -135,13 +131,11 @@ export default function TrendSearch({
         depth,
         region,
         sources,
-        topic_granularity: topicGranularity,
       });
       writeSearchPreferences({
         depth,
         region,
         sources,
-        topicGranularity,
         knownSources: capabilities?.sources
           .filter((source) => source.enabled)
           .map((source) => source.id),

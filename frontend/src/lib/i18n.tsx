@@ -50,7 +50,6 @@ const messages: Record<Lang, Dict> = {
     "nav.radar": "Radar",
     "nav.runs": "Durchläufe",
     "nav.review": "Review",
-    "nav.settings": "Einstellungen",
     "brand.tagline": "AI Trend Scouting",
     "sidebar.collapse": "Einklappen",
     "sidebar.expand": "Ausklappen",
@@ -388,36 +387,6 @@ const messages: Record<Lang, Dict> = {
     "decision.reject": "Ablehnen",
     "decision.restore": "Wiederherstellen",
     "decision.merge": "Zusammenführen",
-    "settings.title": "Einstellungen",
-    "settings.subtitle": "Persönliche Standardwerte und verfügbare Analysedienste",
-    "settings.searchDefaults": "Standards für neue Analysen",
-    "settings.searchDefaultsHint":
-      "Diese Auswahl wird nur in deinem Browser gespeichert und kann vor jedem Durchlauf angepasst werden.",
-    "settings.sourcesHint":
-      "Die Auswahl steuert neue Durchläufe. Zugangsdaten bleiben ausschließlich auf dem Server.",
-    "settings.available": "Verfügbar",
-    "settings.notConfigured": "Nicht konfiguriert",
-    "settings.save": "Standards speichern",
-    "settings.saved": "Einstellungen gespeichert.",
-    "settings.model": "Analysemodell",
-    "settings.modelHint":
-      "BERTopic clustert den kumulierten Evidenzkorpus. Verständliche Presets steuern die Detailtiefe, ohne die reproduzierbare Methodik zu verändern.",
-    "settings.granularity": "Trendgranularität",
-    "settings.granularity.compact": "Kompakt",
-    "settings.granularity.balanced": "Ausgewogen",
-    "settings.granularity.detailed": "Detailliert",
-    "settings.granularityHint.compact":
-      "Bis zu 8 größere Themen; robust bei kleineren Korpora und übersichtlich im Portfolio.",
-    "settings.granularityHint.balanced":
-      "Bis zu 12 Themen; empfohlener Mittelweg für den strategischen Trendradar.",
-    "settings.granularityHint.detailed":
-      "Bis zu 18 feinere Themen; findet eher Nischensignale, kann aber ähnliche Trends erzeugen.",
-    "settings.security": "Sichere Server-Konfiguration",
-    "settings.securityHint":
-      "API-Schlüssel werden bewusst nicht im Browser eingegeben oder gespeichert. Administratoren konfigurieren Firecrawl und OpenAI auf dem Server; Nutzer wählen nur freigegebene Dienste aus.",
-    "settings.firecrawl": "Firecrawl-Recherche",
-    "settings.openai": "OpenAI-Anreicherung",
-    "settings.ready": "Bereit",
   },
   en: {
     "nav.dashboard": "Dashboard",
@@ -426,7 +395,6 @@ const messages: Record<Lang, Dict> = {
     "nav.radar": "Radar",
     "nav.runs": "Analyses",
     "nav.review": "Review",
-    "nav.settings": "Settings",
     "brand.tagline": "AI Trend Scouting",
     "sidebar.collapse": "Collapse",
     "sidebar.expand": "Expand",
@@ -762,36 +730,6 @@ const messages: Record<Lang, Dict> = {
     "decision.reject": "Reject",
     "decision.restore": "Restore",
     "decision.merge": "Merge",
-    "settings.title": "Settings",
-    "settings.subtitle": "Personal defaults and available analysis services",
-    "settings.searchDefaults": "Defaults for new analyses",
-    "settings.searchDefaultsHint":
-      "These preferences are stored only in your browser and can be changed before every analysis.",
-    "settings.sourcesHint":
-      "This selection controls new analyses. Credentials always remain on the server.",
-    "settings.available": "Available",
-    "settings.notConfigured": "Not configured",
-    "settings.save": "Save defaults",
-    "settings.saved": "Settings saved.",
-    "settings.model": "Analysis model",
-    "settings.modelHint":
-      "BERTopic clusters the cumulative evidence corpus. Clear presets control detail without changing the reproducible methodology.",
-    "settings.granularity": "Trend granularity",
-    "settings.granularity.compact": "Compact",
-    "settings.granularity.balanced": "Balanced",
-    "settings.granularity.detailed": "Detailed",
-    "settings.granularityHint.compact":
-      "Up to 8 broader topics; robust for smaller corpora and easy to scan.",
-    "settings.granularityHint.balanced":
-      "Up to 12 topics; the recommended middle ground for the strategic trend radar.",
-    "settings.granularityHint.detailed":
-      "Up to 18 finer topics; more likely to find niche signals, but may create similar trends.",
-    "settings.security": "Secure server configuration",
-    "settings.securityHint":
-      "API keys are deliberately never entered or stored in the browser. Administrators configure Firecrawl and OpenAI on the server; users only select approved services.",
-    "settings.firecrawl": "Firecrawl research",
-    "settings.openai": "OpenAI enrichment",
-    "settings.ready": "Ready",
   },
 };
 

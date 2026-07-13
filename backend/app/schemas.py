@@ -262,7 +262,6 @@ class RunRequest(BaseModel):
         Literal["openalex", "arxiv", "firecrawl", "firecrawl_web"]
     ] = Field(default=[], max_length=4)
     holistic_pestel: bool = True
-    topic_granularity: Literal["compact", "balanced", "detailed"] = "balanced"
 
 
 class SearchSourceOut(BaseModel):
@@ -276,7 +275,6 @@ class SearchCapabilitiesOut(BaseModel):
     default_sources: list[str]
     openai_enrichment: bool
     topic_model: str
-    topic_granularities: list[str]
     max_documents: int = 200
 
 

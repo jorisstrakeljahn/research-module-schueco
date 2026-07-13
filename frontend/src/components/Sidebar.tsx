@@ -7,7 +7,6 @@ import {
   LayoutDashboard,
   Radar,
   Rss,
-  Settings,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -22,7 +21,6 @@ const NAV = [
   { href: "/newsfeed", labelKey: "nav.newsfeed", icon: Rss },
   { href: "/radar", labelKey: "nav.radar", icon: Radar },
   { href: "/runs", labelKey: "nav.runs", icon: GitCompareArrows },
-  { href: "/settings", labelKey: "nav.settings", icon: Settings },
 ];
 
 export default function Sidebar() {
