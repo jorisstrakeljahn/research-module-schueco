@@ -1,14 +1,16 @@
 "use client";
 
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Loader2, Trash2 } from "lucide-react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 
 import PageHeader from "@/components/PageHeader";
 import ReviewCard from "@/components/ReviewCard";
 import {
   CATEGORY_META,
+  deleteRun,
   fetchReviewQueue,
   fetchRunDiff,
   RADAR_STAGE_META,
@@ -20,11 +22,33 @@ import { useI18n } from "@/lib/i18n";
 
 export default function RunDetailPage() {
   const { t, lang } = useI18n();
+  const router = useRouter();
   const params = useParams<{ id: string }>();
   const runId = Number(params.id);
   const [diff, setDiff] = useState<RunDiff | null>(null);
   const [reviews, setReviews] = useState<ReviewQueueItem[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  async function handleDelete() {
+    if (!confirmDelete) {
+      setConfirmDelete(true);
+      return;
+    }
+    setDeleting(true);
+    try {
+      await deleteRun(runId);
+      toast.success(t("runDetail.deleteDone"));
+      router.push("/runs");
+    } catch (deleteError) {
+      setDeleting(false);
+      setConfirmDelete(false);
+      toast.error(t("runDetail.deleteError"), {
+        description: String(deleteError),
+      });
+    }
+  }
 
   const load = useCallback(async () => {
     try {
@@ -106,6 +130,45 @@ export default function RunDetailPage() {
                   {t("runDetail.noMaterialChanges")}
                 </p>
               )}
+
+              <section className="rounded-xl border border-digital/30 bg-digital/5 p-5">
+                <h2 className="text-sm font-semibold text-fg">
+                  {t("runDetail.deleteTitle")}
+                </h2>
+                <p className="mt-1 text-sm text-muted">
+                  {t("runDetail.deleteHint")}
+                </p>
+                <div className="mt-4 flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={handleDelete}
+                    disabled={deleting}
+                    className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:opacity-60 ${
+                      confirmDelete
+                        ? "bg-digital text-white hover:opacity-90"
+                        : "border border-digital/50 text-digital hover:bg-digital/10"
+                    }`}
+                  >
+                    {deleting ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-4 w-4" />
+                    )}
+                    {confirmDelete
+                      ? t("runDetail.deleteConfirm")
+                      : t("runDetail.delete")}
+                  </button>
+                  {confirmDelete && !deleting && (
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDelete(false)}
+                      className="rounded-lg border border-border px-4 py-2 text-sm text-muted hover:bg-hover"
+                    >
+                      {t("common.cancel")}
+                    </button>
+                  )}
+                </div>
+              </section>
             </div>
           )}
         </div>
