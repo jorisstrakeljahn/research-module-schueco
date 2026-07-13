@@ -161,6 +161,9 @@ function PestelGrid({ analysis }: { analysis: PestelAnalysis }) {
 
 function PestelDimension({ dimension }: { dimension: PestelDimensionAnalysis }) {
   const { t } = useI18n();
+  // The same document can back a dimension multiple times (e.g. across runs);
+  // show each title only once.
+  const evidenceTitles = [...new Set(dimension.evidence.map((item) => item.title))];
   return (
     <article className="min-w-0 rounded-lg border border-border bg-bg p-4">
       <div className="flex items-center justify-between gap-3">
@@ -187,9 +190,9 @@ function PestelDimension({ dimension }: { dimension: PestelDimensionAnalysis }) 
             ? t("portfolioDetail.pestelTerms", { terms: dimension.signal_terms.join(", ") })
             : t("portfolioDetail.pestelNoTerms")}
         </li>
-        {dimension.evidence.slice(0, 2).map((item) => (
-          <li key={`${dimension.dimension}-${item.title}`} className="text-fg">
-            {item.title}
+        {evidenceTitles.slice(0, 2).map((title) => (
+          <li key={title} className="text-fg">
+            {title}
           </li>
         ))}
       </ul>
