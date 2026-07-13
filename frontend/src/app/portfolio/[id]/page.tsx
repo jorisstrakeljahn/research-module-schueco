@@ -161,18 +161,7 @@ function PestelDimension({ dimension }: { dimension: PestelDimensionAnalysis }) 
   const evidenceTitles = [...new Set(dimension.evidence.map((item) => item.title))];
   return (
     <article className="min-w-0 rounded-lg border border-border bg-bg p-4">
-      <div className="flex items-center justify-between gap-3">
-        <h3 className="text-sm font-semibold text-fg">{t(`pestel.${dimension.dimension}`)}</h3>
-        <span className="text-xs font-semibold tabular-nums text-primary">
-          {dimension.relevance.toFixed(1)}/10
-        </span>
-      </div>
-      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-border">
-        <div
-          className="h-full rounded-full bg-primary"
-          style={{ width: `${dimension.relevance * 10}%` }}
-        />
-      </div>
+      <h3 className="text-sm font-semibold text-fg">{t(`pestel.${dimension.dimension}`)}</h3>
       <ul className="mt-3 space-y-1.5 wrap-break-word text-xs leading-relaxed text-muted">
         <li>
           {t("portfolioDetail.pestelCoverage", {

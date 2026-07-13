@@ -113,11 +113,6 @@ export default function TrendDetailPage() {
 
       <div className="mt-2 flex flex-wrap items-center gap-x-4 text-[13px] text-muted">
         <span>{t("detail.docs", { n: trend.size })}</span>
-        {trend.emergence != null && (
-          <span title={t("detail.emergenceTip")}>
-            {t("detail.emergenceLabel")} {trend.emergence.toFixed(2)}
-          </span>
-        )}
       </div>
 
       <Section title={t("detail.section.summary")}>

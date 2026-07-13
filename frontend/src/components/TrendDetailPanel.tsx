@@ -75,12 +75,6 @@ export default function TrendDetailPanel({
             <Score field="uncertainty" value={trend.uncertainty} />
           </div>
 
-          {trend.emergence != null && (
-            <Field label={t("detail.emergenceLabel")}>
-              <span className="text-sm text-fg">{trend.emergence.toFixed(2)}</span>
-            </Field>
-          )}
-
           <Field label={t("detail.keywords")}>
             <span className="text-sm text-muted">{trend.keywords.join(", ")}</span>
           </Field>
