@@ -47,7 +47,9 @@ export default function SearchProgressModal({
       aria-modal="true"
       aria-labelledby="search-progress-title"
     >
-      <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-border-strong bg-surface shadow-2xl">
+      {/* Fixed height: the dialog opens at its final size instead of growing
+          line by line while progress events stream in. */}
+      <div className="flex h-[min(44rem,90vh)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-border-strong bg-surface shadow-2xl">
         <header className="border-b border-border px-6 py-4">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
@@ -172,6 +174,9 @@ export default function SearchProgressModal({
                 ? t("search.progress.close")
                 : t("search.progress.background")}
             </button>
+            {/* No onClick close here: unmounting the link mid-transition can
+                cancel the navigation. GlobalSearchProgress closes the dialog
+                once the route change lands. */}
             {completed && (
               <Link
                 href={`/runs/${progress.run_id}`}

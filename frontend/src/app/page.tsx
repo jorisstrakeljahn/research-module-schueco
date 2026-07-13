@@ -1,147 +1,85 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import PageHeader from "@/components/PageHeader";
-import SearchProgressModal, {
-  SearchProgressPill,
-} from "@/components/SearchProgressModal";
 import TrendSearch from "@/components/TrendSearch";
 import {
   fetchPortfolioTrends,
-  fetchRunDiff,
-  fetchRunProgress,
   fetchRuns,
   MATURITY_META,
   MATURITY_ORDER,
   PESTEL_SECTORS,
+  type PortfolioTrend,
   type Run,
-  type RunDiff,
-  type RunMode,
-  type RunProgress,
-  type Trend,
 } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
+import { useRunProgress } from "@/lib/run-progress";
 
 export default function DashboardPage() {
   const { t, lang } = useI18n();
-  const [trends, setTrends] = useState<Trend[]>([]);
+  const { startRun, completedCount } = useRunProgress();
+  const [trends, setTrends] = useState<PortfolioTrend[]>([]);
   const [run, setRun] = useState<Run | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeRunId, setActiveRunId] = useState<number | null>(null);
-  const [activeQuery, setActiveQuery] = useState("");
-  const [activeMode, setActiveMode] = useState<RunMode>("deep_research");
-  const [runProgress, setRunProgress] = useState<RunProgress | null>(null);
-  const [activeDiff, setActiveDiff] = useState<RunDiff | null>(null);
-  const [progressOpen, setProgressOpen] = useState(false);
-  const terminalHandledRef = useRef<number | null>(null);
-
-  const reload = useCallback(() => {
-    fetchPortfolioTrends("active", lang).then(setTrends).catch((e) => setError(String(e)));
-    fetchRuns()
-      .then((runs) => setRun(runs[0] ?? null))
-      .catch(() => setRun(null));
-  }, [lang]);
 
   useEffect(() => {
-    Promise.all([fetchPortfolioTrends("active", lang), fetchRuns()])
+    Promise.all([
+      fetchPortfolioTrends("active", lang, { includePending: true }),
+      fetchRuns(),
+    ])
       .then(([trendList, runs]) => {
         setTrends(trendList);
         setRun(runs[0] ?? null);
+        setError(null);
       })
       .catch((e) => setError(String(e)))
       .finally(() => setLoading(false));
-  }, [lang]);
+  }, [lang, completedCount]);
 
-  useEffect(() => {
-    if (activeRunId == null) return;
-    const runId = activeRunId;
-    let cancelled = false;
-    let timer: ReturnType<typeof setTimeout> | null = null;
-
-    async function poll() {
-      try {
-        const next = await fetchRunProgress(runId);
-        if (cancelled) return;
-        setRunProgress(next);
-        const terminal = next.status === "completed" || next.status === "failed";
-        if (terminal) {
-          if (terminalHandledRef.current !== runId) {
-            terminalHandledRef.current = runId;
-            if (next.status === "completed") {
-              const diff = await fetchRunDiff(runId, lang);
-              if (cancelled) return;
-              setActiveDiff(diff);
-              reload();
-              toast.success(t("search.toastDoneTitle"), {
-                description: t("search.toastDoneDesc", {
-                  topics: next.n_topics,
-                  docs: next.n_documents,
-                }),
-              });
-            } else {
-              toast.error(t("search.toastFailedTitle"), {
-                description: next.error ?? "",
-              });
-            }
-          }
-          return;
-        }
-      } catch {
-        /* transient API failure; keep polling the background run */
-      }
-      if (!cancelled) timer = setTimeout(poll, 1200);
-    }
-
-    poll();
-    return () => {
-      cancelled = true;
-      if (timer) clearTimeout(timer);
-    };
-  }, [activeRunId, reload, t, lang]);
-
-  function handleStarted(result: {
-    run_id: number;
-    query: string;
-    mode: RunMode;
-  }) {
-    terminalHandledRef.current = null;
-    setActiveRunId(result.run_id);
-    setActiveQuery(result.query);
-    setActiveMode(result.mode);
-    setActiveDiff(null);
-    setRunProgress({
-      run_id: result.run_id,
-      status: "running",
-      phase: "queued",
-      progress: 2,
-      message: "",
-      n_documents: 0,
-      n_topics: 0,
-      error: null,
-      events: [],
-    });
-    setProgressOpen(true);
-    toast.success(t("search.toastStartTitle"), {
-      description: t("search.toastStartDesc", { query: result.query }),
-    });
-  }
+  const active = useMemo(
+    () => trends.filter((trend) => !isPendingNew(trend)),
+    [trends],
+  );
+  const pendingNew = useMemo(
+    () => trends.filter((trend) => isPendingNew(trend)),
+    [trends],
+  );
+  const pendingTotal = useMemo(
+    () => trends.filter((trend) => trend.pending_review).length,
+    [trends],
+  );
+  const pendingRunId = useMemo(
+    () =>
+      trends.reduce<number | null>(
+        (latest, trend) =>
+          trend.pending_run_id != null &&
+          (latest == null || trend.pending_run_id > latest)
+            ? trend.pending_run_id
+            : latest,
+        null,
+      ),
+    [trends],
+  );
 
   const maturityCounts = useMemo(() => {
     const c: Record<string, number> = {};
-    for (const t of trends) if (t.maturity) c[t.maturity] = (c[t.maturity] ?? 0) + 1;
+    for (const t of active) if (t.maturity) c[t.maturity] = (c[t.maturity] ?? 0) + 1;
     return c;
-  }, [trends]);
+  }, [active]);
 
   const pestelCounts = useMemo(() => {
     const c: Record<string, number> = {};
-    for (const t of trends) for (const p of t.pestel ?? []) c[p] = (c[p] ?? 0) + 1;
+    for (const t of active) for (const p of t.pestel ?? []) c[p] = (c[p] ?? 0) + 1;
     return c;
-  }, [trends]);
+  }, [active]);
 
-  const actCount = trends.filter((t) => t.radar_stage === "act").length;
+  const actCount = active.filter((t) => t.radar_stage === "act").length;
+  // Unreviewed candidates that would land in the "act" ring once approved.
+  const pendingActCount = pendingNew.filter((t) => t.radar_stage === "act").length;
 
   return (
     <div className="flex h-full min-w-0 flex-col overflow-hidden">
@@ -157,15 +95,46 @@ export default function DashboardPage() {
         <div className="flex-1 overflow-auto">
           <div className="mx-auto max-w-5xl space-y-6 p-6">
             <TrendSearch
-              onStarted={handleStarted}
+              onStarted={startRun}
               onError={(message) =>
                 toast.error(t("search.toastErrorTitle"), { description: message })
               }
             />
 
+            {pendingTotal > 0 && pendingRunId != null && (
+              <Link
+                href={`/runs/${pendingRunId}`}
+                className="flex items-center justify-between gap-3 rounded-xl border border-pending/40 bg-pending/10 px-5 py-3.5 transition-colors hover:bg-pending/15"
+              >
+                <span className="text-sm text-fg">
+                  {t("dashboard.pendingBanner", { n: pendingTotal })}
+                </span>
+                <span className="shrink-0 text-sm font-medium text-pending">
+                  {t("dashboard.pendingBannerCta")} →
+                </span>
+              </Link>
+            )}
+
       <div className="grid grid-cols-2 gap-4">
-        <KpiCard value={trends.length} label={t("dashboard.kpi.total")} />
-        <KpiCard value={actCount} label={t("dashboard.kpi.act")} accent />
+        <KpiCard
+          value={active.length}
+          label={t("dashboard.kpi.total")}
+          badge={
+            pendingNew.length > 0
+              ? t("dashboard.kpi.pendingNew", { n: pendingNew.length })
+              : undefined
+          }
+        />
+        <KpiCard
+          value={actCount}
+          label={t("dashboard.kpi.act")}
+          accent
+          badge={
+            pendingActCount > 0
+              ? t("dashboard.kpi.pendingAct", { n: pendingActCount })
+              : undefined
+          }
+        />
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -175,7 +144,7 @@ export default function DashboardPage() {
               key={m}
               label={t(`maturity.${m}`)}
               count={maturityCounts[m] ?? 0}
-              total={trends.length}
+              total={active.length}
               color={MATURITY_META[m].color}
             />
           ))}
@@ -186,7 +155,7 @@ export default function DashboardPage() {
               key={s.key}
               label={s.label}
               count={pestelCounts[s.key] ?? 0}
-              total={trends.length}
+              total={active.length}
               color="#00a651"
             />
           ))}
@@ -214,41 +183,38 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
-      {runProgress && (
-        <>
-          <SearchProgressModal
-            open={progressOpen}
-            query={activeQuery}
-            mode={activeMode}
-            progress={runProgress}
-            diff={activeDiff}
-            onClose={() => setProgressOpen(false)}
-          />
-          {!progressOpen && (
-            <SearchProgressPill
-              progress={runProgress}
-              onClick={() => setProgressOpen(true)}
-            />
-          )}
-        </>
-      )}
     </div>
   );
+}
+
+function isPendingNew(trend: PortfolioTrend): boolean {
+  return Boolean(trend.pending_review) && String(trend.id).startsWith("pending-");
 }
 
 function KpiCard({
   value,
   label,
   accent,
+  badge,
 }: {
   value: number;
   label: string;
   accent?: boolean;
+  badge?: string;
 }) {
   return (
     <div className="rounded-xl border border-border bg-surface p-5 shadow-sm">
-      <div className={`text-3xl font-semibold ${accent ? "text-primary" : "text-fg"}`}>
-        {value}
+      <div className="flex items-baseline gap-2">
+        <span
+          className={`text-3xl font-semibold ${accent ? "text-primary" : "text-fg"}`}
+        >
+          {value}
+        </span>
+        {badge && (
+          <span className="rounded-full bg-pending/15 px-2 py-0.5 text-xs font-medium text-pending">
+            {badge}
+          </span>
+        )}
       </div>
       <div className="mt-1 text-sm text-muted">{label}</div>
     </div>
@@ -291,4 +257,3 @@ function Bar({
     </div>
   );
 }
-

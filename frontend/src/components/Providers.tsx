@@ -2,7 +2,9 @@
 
 import { ThemeProvider } from "next-themes";
 
+import GlobalSearchProgress from "@/components/GlobalSearchProgress";
 import { I18nProvider } from "@/lib/i18n";
+import { RunProgressProvider } from "@/lib/run-progress";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   return (
@@ -12,7 +14,12 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       enableSystem
       disableTransitionOnChange
     >
-      <I18nProvider>{children}</I18nProvider>
+      <I18nProvider>
+        <RunProgressProvider>
+          {children}
+          <GlobalSearchProgress />
+        </RunProgressProvider>
+      </I18nProvider>
     </ThemeProvider>
   );
 }
