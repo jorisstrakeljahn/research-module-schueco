@@ -300,17 +300,29 @@ def run_pipeline(
         # 2. Embed (one chunk per document in v0)
         if progress:
             progress("embedding", 52, "Semantic document embeddings are being generated", None)
-        embedder = get_embedder(
-            settings.embedder,
-            settings.embedding_dim,
-            model_name=settings.sentence_transformer_model,
-            model_revision=settings.embedder_revision,
-        )
+        embedder_name = settings.embedder
+        try:
+            embedder = get_embedder(
+                settings.embedder,
+                settings.embedding_dim,
+                model_name=settings.sentence_transformer_model,
+                model_revision=settings.embedder_revision,
+            )
+        except Exception:
+            # Missing optional extra (ml/llm) or model download failure must not
+            # abort the run: degrade to the deterministic offline embedder.
+            logger.warning(
+                "Embedder %r unavailable; falling back to offline hashing embedder",
+                settings.embedder,
+                exc_info=True,
+            )
+            embedder_name = "hashing"
+            embedder = get_embedder("hashing", settings.embedding_dim)
         embeddings = embed_documents_cached(
             session,
             docs,
             embedder=embedder,
-            model_name=settings.embedder,
+            model_name=embedder_name,
             model_revision=settings.embedder_revision,
         )
 

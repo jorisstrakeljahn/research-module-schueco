@@ -8,10 +8,13 @@ each cluster via a class-based TF-IDF (c-TF-IDF), mirroring the idea behind BERT
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from typing import Protocol
 
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -146,15 +149,30 @@ class BERTopicModeler:
                 random_state=self.random_state,
             ).fit(texts, embeddings)
 
-        from bertopic import BERTopic
-        from hdbscan import HDBSCAN
-        from sklearn.cluster import KMeans
-        from sklearn.feature_extraction.text import CountVectorizer
-        from umap import UMAP
+        try:
+            from bertopic import BERTopic
+            from hdbscan import HDBSCAN
+            from sklearn.cluster import KMeans
+            from sklearn.feature_extraction.text import CountVectorizer
+            from umap import UMAP
+        except ImportError:
+            # The ``ml`` extra is not installed: degrade to the offline K-Means
+            # modeler instead of aborting the whole run.
+            logger.warning(
+                "BERTopic unavailable (ml extra not installed); "
+                "falling back to SimpleTopicModeler"
+            )
+            return SimpleTopicModeler(
+                n_topics=self.n_topics,
+                max_topics=self.max_topics,
+                random_state=self.random_state,
+            ).fit(texts, embeddings)
 
         def make_model(cluster_model) -> BERTopic:
+            # nr_topics is a HARD cap: BERTopic merges the discovered clusters down
+            # to at most this many topics, so a run never floods the review queue.
             return BERTopic(
-                nr_topics=self.n_topics,
+                nr_topics=self.n_topics or self.max_topics,
                 calculate_probabilities=False,
                 umap_model=UMAP(
                     n_neighbors=min(15, max(2, len(texts) - 1)),
