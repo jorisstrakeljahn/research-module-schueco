@@ -62,7 +62,7 @@ export default function PortfolioTrendPage() {
   return (
     <div className="h-full overflow-auto">
       <article className="mx-auto max-w-6xl p-6">
-        <Link href="/portfolio" className="inline-flex items-center gap-2 text-sm text-muted hover:text-fg">
+        <Link href="/newsfeed" className="inline-flex items-center gap-2 text-sm text-muted hover:text-fg">
           <ArrowLeft className="h-4 w-4" /> {t("portfolioDetail.back")}
         </Link>
 

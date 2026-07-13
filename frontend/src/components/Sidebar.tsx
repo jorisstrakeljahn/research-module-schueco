@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  BriefcaseBusiness,
   ChevronLeft,
   ChevronRight,
   GitCompareArrows,
@@ -21,7 +20,6 @@ import { setSidebarCollapsed, useSidebarCollapsed } from "@/lib/sidebar";
 
 const NAV = [
   { href: "/", labelKey: "nav.dashboard", icon: LayoutDashboard },
-  { href: "/portfolio", labelKey: "nav.portfolio", icon: BriefcaseBusiness },
   { href: "/newsfeed", labelKey: "nav.newsfeed", icon: Rss },
   { href: "/radar", labelKey: "nav.radar", icon: Radar },
   { href: "/runs", labelKey: "nav.runs", icon: GitCompareArrows },
