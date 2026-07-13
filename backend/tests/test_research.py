@@ -5,7 +5,7 @@ from __future__ import annotations
 from app.ingestion.base import RawDocument
 from app.models import CanonicalTrend, ExpertFeedback, Run, Topic, Trend, TrendOccurrence
 from app.research.crawler import DeepResearchCrawler
-from app.research.expand import LLMQueryExpander, NoopExpander
+from app.research.expand import KeywordExpander, LLMQueryExpander, NoopExpander
 from app.research.feedback import (
     negative_terms_from_feedback,
     seeds_from_feedback,
@@ -92,6 +92,47 @@ def test_keyword_relevance_excludes() -> None:
 
 def test_noop_expander_returns_nothing() -> None:
     assert NoopExpander().expand("d", ["s"], ["t"], ["u"]) == []
+
+
+def test_keyword_expander_proposes_recurring_bigrams() -> None:
+    titles = [
+        "Vacuum glazing improves thermal performance",
+        "New vacuum glazing systems for facades",
+        "Vacuum glazing market outlook",
+        "Unrelated cooking recipe",
+    ]
+    proposals = KeywordExpander().expand(
+        "building envelope", ["facade technology"], titles, ["facade technology"], n=3
+    )
+    assert "vacuum glazing" in proposals
+    # Terms already covered by previous queries must not be proposed again.
+    proposals_used = KeywordExpander().expand(
+        "building envelope",
+        ["vacuum glazing"],
+        titles,
+        ["vacuum glazing"],
+        n=3,
+    )
+    assert "vacuum glazing" not in proposals_used
+
+
+def test_crawler_reports_progress_events() -> None:
+    docs = [_doc(1, "adaptive facade"), _doc(2, "solar glass")]
+    connector = FakeConnector({"facade": docs})
+    events: list[tuple[str, dict]] = []
+    crawler = DeepResearchCrawler(
+        [connector],
+        max_rounds=1,
+        max_docs=10,
+        observer=lambda event, details: events.append((event, details)),
+    )
+    result = crawler.crawl(["facade"])
+    assert len(result.documents) == 2
+    names = [name for name, _ in events]
+    assert names == ["round_started", "source_searched", "round_completed"]
+    searched = dict(events)[("source_searched")]
+    assert searched["source"] == "Fake"
+    assert searched["findings"] == 2
 
 
 def test_llm_relevance_fails_open_on_api_error() -> None:

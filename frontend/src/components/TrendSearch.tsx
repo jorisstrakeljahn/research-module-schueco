@@ -64,11 +64,25 @@ export default function TrendSearch({
       try {
         const data = await fetchSearchCapabilities();
         setCapabilities(data);
-        const allowed = new Set(data.sources.filter((source) => source.enabled).map((source) => source.id));
+        const enabled = data.sources
+          .filter((source) => source.enabled)
+          .map((source) => source.id);
+        const allowed = new Set(enabled);
         const preferred = preferences.sources.filter((source) => allowed.has(source));
-        const selectedSources = preferred.length > 0 ? preferred : data.default_sources;
+        // Sources that became available since the preferences were saved (e.g. a
+        // freshly configured API key) are opted in automatically.
+        const known = new Set(preferences.knownSources ?? preferences.sources);
+        const newlyAvailable = enabled.filter((source) => !known.has(source));
+        const selectedSources =
+          preferred.length > 0
+            ? [...new Set([...preferred, ...newlyAvailable])]
+            : data.default_sources;
         setSources(selectedSources);
-        writeSearchPreferences({ ...preferences, sources: selectedSources });
+        writeSearchPreferences({
+          ...preferences,
+          sources: selectedSources,
+          knownSources: enabled,
+        });
       } catch {
         setCapabilities(null);
       }
@@ -103,7 +117,15 @@ export default function TrendSearch({
         sources,
         topic_granularity: topicGranularity,
       });
-      writeSearchPreferences({ depth, region, sources, topicGranularity });
+      writeSearchPreferences({
+        depth,
+        region,
+        sources,
+        topicGranularity,
+        knownSources: capabilities?.sources
+          .filter((source) => source.enabled)
+          .map((source) => source.id),
+      });
       onStarted?.(result);
       setQuery("");
       setKeywords([]);

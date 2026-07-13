@@ -13,11 +13,17 @@ away - the controlled design discussed with the user.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
+from typing import Any
 
 from app.ingestion.base import Connector, RawDocument, doc_key
 from app.research.expand import NoopExpander, QueryExpander
 from app.research.relevance import PassthroughRelevance, RelevanceFilter
+
+# Called with (event_name, details) as the crawl progresses, e.g.
+# ("source_searched", {"source": "OpenAlex", "query": "...", "findings": 12}).
+CrawlObserver = Callable[[str, dict[str, Any]], None]
 
 
 @dataclass
@@ -41,6 +47,7 @@ class DeepResearchCrawler:
         max_docs: int = 80,
         per_query_limit: int = 20,
         expand_terms: int = 4,
+        observer: CrawlObserver | None = None,
     ) -> None:
         self.connectors = connectors
         self.expander = expander or NoopExpander()
@@ -50,6 +57,14 @@ class DeepResearchCrawler:
         self.max_docs = max(1, max_docs)
         self.per_query_limit = max(1, per_query_limit)
         self.expand_terms = max(0, expand_terms)
+        self._observer = observer
+
+    def _notify(self, event: str, details: dict) -> None:
+        if self._observer:
+            try:
+                self._observer(event, details)
+            except Exception:  # observers must never break the crawl
+                pass
 
     def crawl(self, seeds: list[str]) -> CrawlResult:
         frontier: list[str] = [s.strip() for s in seeds if s and s.strip()]
@@ -63,6 +78,10 @@ class DeepResearchCrawler:
             if not pending or len(collected) >= self.max_docs:
                 break
             rounds_done += 1
+            self._notify(
+                "round_started",
+                {"round": rounds_done, "queries": list(pending)},
+            )
 
             # 1. fetch
             fetched: list[RawDocument] = []
@@ -71,11 +90,30 @@ class DeepResearchCrawler:
                 used_set.add(query.lower())
                 for connector in self.connectors:
                     try:
-                        fetched.extend(
-                            connector.fetch(query, limit=self.per_query_limit)
-                        )
+                        found = connector.fetch(query, limit=self.per_query_limit)
                     except Exception:
+                        self._notify(
+                            "source_failed",
+                            {
+                                "source": getattr(
+                                    connector, "source_name", type(connector).__name__
+                                ),
+                                "query": query,
+                            },
+                        )
                         continue
+                    fetched.extend(found)
+                    self._notify(
+                        "source_searched",
+                        {
+                            "source": getattr(
+                                connector, "source_name", type(connector).__name__
+                            ),
+                            "source_type": getattr(connector, "source_type", None),
+                            "query": query,
+                            "findings": len(found),
+                        },
+                    )
 
             # 2. de-duplicate (within batch and against already-collected)
             unique: list[RawDocument] = []
@@ -93,6 +131,15 @@ class DeepResearchCrawler:
                 if len(collected) >= self.max_docs:
                     break
                 collected[doc_key(doc)] = doc
+            self._notify(
+                "round_completed",
+                {
+                    "round": rounds_done,
+                    "unique": len(unique),
+                    "kept": len(kept),
+                    "total": len(collected),
+                },
+            )
 
             # 4. expand the frontier for the next round
             if round_index < self.max_rounds - 1 and len(collected) < self.max_docs:
@@ -100,9 +147,13 @@ class DeepResearchCrawler:
                 new_terms = self.expander.expand(
                     self.domain, seeds, titles, used, n=self.expand_terms
                 )
+                added = []
                 for term in new_terms:
                     if term.lower() not in used_set and term not in frontier:
                         frontier.append(term)
+                        added.append(term)
+                if added:
+                    self._notify("queries_expanded", {"queries": added})
 
         documents = list(collected.values())[: self.max_docs]
         return CrawlResult(documents=documents, queries_used=used, rounds=rounds_done)

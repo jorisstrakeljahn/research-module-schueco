@@ -89,29 +89,53 @@ def run_simple_search(
         if progress:
             progress(
                 "researching",
-                10,
+                8,
                 "Connected sources are being searched",
-                {"sources": source_names},
+                {"code": "search_started", "sources": source_names, "query": query},
             )
         fetched: list[RawDocument] = []
-        for connector in connectors:
+        for index, connector in enumerate(connectors):
+            name = getattr(connector, "source_name", type(connector).__name__)
+            source_type = getattr(connector, "source_type", None)
+            pct = 8 + round((index + 1) / max(1, len(connectors)) * 14)
             try:
-                fetched.extend(connector.fetch(query, limit=per_limit))
+                found = connector.fetch(query, limit=per_limit)
             except Exception:
                 logger.warning(
                     "Connector %s failed for query %r; skipping",
-                    getattr(connector, "source_name", type(connector).__name__),
+                    name,
                     query,
                     exc_info=True,
                 )
+                if progress:
+                    progress(
+                        "researching",
+                        pct,
+                        f"Source {name} failed",
+                        {"code": "source_failed", "source": name, "query": query},
+                    )
                 continue
+            fetched.extend(found)
+            if progress:
+                progress(
+                    "researching",
+                    pct,
+                    f"Searched {name}",
+                    {
+                        "code": "source_searched",
+                        "source": name,
+                        "source_type": source_type,
+                        "query": query,
+                        "findings": len(found),
+                    },
+                )
         raw_docs = dedupe(fetched)
         if progress:
             progress(
                 "researching",
                 25,
                 "Source search completed",
-                {"findings": len(raw_docs)},
+                {"code": "search_completed", "findings": len(raw_docs)},
             )
 
         return run_pipeline(
@@ -158,7 +182,11 @@ def run_deep_research(
     portfolio_seeds = seeds_from_portfolio(session)
     fb_seeds = seeds_from_feedback(session) if use_feedback else []
     excludes = negative_terms_from_feedback(session) if use_feedback else []
-    merged = merge_seeds(base_seeds, portfolio_seeds, fb_seeds)
+    # Base seeds (user query + lenses) come first, so the cap trims portfolio /
+    # feedback context before it ever cuts into the user's own query.
+    merged = merge_seeds(base_seeds, portfolio_seeds, fb_seeds)[
+        : settings.research_max_seed_queries
+    ]
 
     # Expert rejections only take effect through an active relevance gate. With the
     # default RELEVANCE=off (PassthroughRelevance) they would be silently ignored, so
@@ -176,15 +204,38 @@ def run_deep_research(
         include_terms=merged,
         exclude_terms=excludes,
     )
+    rounds_budget = max_rounds or settings.research_max_rounds
+    # Map crawl events onto a slowly advancing 8..24% window so the user sees
+    # the research phase move source by source.
+    fetch_estimate = max(1, len(merged) * max(1, len(connectors)) * rounds_budget)
+    fetches_seen = 0
+
+    def observe(event: str, details: dict) -> None:
+        nonlocal fetches_seen
+        if progress is None:
+            return
+        if event in ("source_searched", "source_failed"):
+            fetches_seen += 1
+        pct = 8 + min(16, round(fetches_seen / fetch_estimate * 16))
+        message = {
+            "round_started": "Search round started",
+            "source_searched": "Source searched",
+            "source_failed": "Source failed",
+            "round_completed": "Search round completed",
+            "queries_expanded": "Follow-up queries generated",
+        }.get(event, event)
+        progress("researching", pct, message, {"code": event, **details})
+
     crawler = DeepResearchCrawler(
         connectors,
         expander=expander,
         relevance=relevance,
         domain=settings.research_domain,
-        max_rounds=max_rounds or settings.research_max_rounds,
+        max_rounds=rounds_budget,
         max_docs=max_docs or settings.research_max_docs,
         per_query_limit=per_query_limit or settings.research_per_query_limit,
         expand_terms=settings.research_expand_terms,
+        observer=observe,
     )
     query = focus_query or settings.research_domain
     run_params = {
@@ -205,7 +256,7 @@ def run_deep_research(
                 "researching",
                 8,
                 "Deep research is expanding and evaluating search queries",
-                {"sources": source_names, "seeds": merged},
+                {"code": "search_started", "sources": source_names, "seeds": merged},
             )
         result = crawler.crawl(merged)
         if progress:
@@ -214,6 +265,7 @@ def run_deep_research(
                 25,
                 "Deep research crawl completed",
                 {
+                    "code": "search_completed",
                     "findings": len(result.documents),
                     "rounds": result.rounds,
                     "queries": len(result.queries_used),

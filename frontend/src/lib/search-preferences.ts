@@ -13,6 +13,9 @@ export interface SearchPreferences {
   region: SearchRegion;
   depth: ResearchDepth;
   sources: string[];
+  /** Source ids that were available when the preferences were saved. Lets the UI
+   * auto-enable sources that became available later (e.g. new API key). */
+  knownSources?: string[];
   topicGranularity: TopicGranularity;
 }
 
@@ -41,6 +44,9 @@ export function readSearchPreferences(): SearchPreferences {
       sources: Array.isArray(value.sources)
         ? value.sources
         : DEFAULT_SEARCH_PREFERENCES.sources,
+      knownSources: Array.isArray(value.knownSources)
+        ? value.knownSources
+        : undefined,
       topicGranularity:
         value.topicGranularity ?? DEFAULT_SEARCH_PREFERENCES.topicGranularity,
     };

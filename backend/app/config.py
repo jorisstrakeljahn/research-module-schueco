@@ -54,6 +54,9 @@ class Settings(BaseSettings):
     research_max_docs: int = 80
     research_per_query_limit: int = 20
     research_expand_terms: int = 4
+    # Upper bound on first-round queries (user query + PESTEL lenses + portfolio /
+    # feedback seeds). Keeps deep runs fast and external API costs bounded.
+    research_max_seed_queries: int = 12
     seed_terms: str = ""  # comma-separated; overrides the built-in domain seeds when set
 
     # External APIs

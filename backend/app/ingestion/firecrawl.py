@@ -15,7 +15,7 @@ import httpx
 
 from app.ingestion.base import RawDocument, parse_date
 
-FIRECRAWL_SEARCH_URL = "https://api.firecrawl.dev/v1/search"
+FIRECRAWL_SEARCH_URL = "https://api.firecrawl.dev/v2/search"
 
 
 def _result_to_document(item: dict, source_type: str) -> RawDocument | None:
@@ -23,7 +23,8 @@ def _result_to_document(item: dict, source_type: str) -> RawDocument | None:
     url = item.get("url") or metadata.get("sourceURL") or metadata.get("url")
     raw_title = item.get("title") or metadata.get("title")
     body = (
-        item.get("description")
+        item.get("snippet")
+        or item.get("description")
         or item.get("markdown")
         or metadata.get("description")
         or ""
@@ -61,22 +62,37 @@ class FirecrawlConnector:
         api_key: str,
         client: httpx.Client | None = None,
         source_type: str = "news",
+        max_results: int = 10,
     ) -> None:
         if not api_key:
             raise ValueError("FirecrawlConnector requires an API key.")
         self._api_key = api_key
         self.source_type = source_type
+        # Firecrawl bills per result; cap each search so one deep-research run
+        # (dozens of queries) stays within a predictable credit budget.
+        self._max_results = max(1, max_results)
         self._client = client or httpx.Client(timeout=60.0)
 
     def fetch(self, query: str, limit: int = 50) -> list[RawDocument]:
+        # v2 search separates result buckets; "news" gives dated market signals,
+        # "web" gives broader (noisier) weak signals.
+        bucket = "news" if self.source_type == "news" else "web"
         resp = self._client.post(
             FIRECRAWL_SEARCH_URL,
             headers={"Authorization": f"Bearer {self._api_key}"},
-            json={"query": query, "limit": min(limit, 50)},
+            json={
+                "query": query,
+                "limit": min(limit, self._max_results),
+                "sources": [bucket],
+            },
         )
         resp.raise_for_status()
         payload = resp.json()
-        items = payload.get("data") or payload.get("results") or []
+        data = payload.get("data") or {}
+        if isinstance(data, dict):
+            items = data.get(bucket) or []
+        else:  # pragma: no cover - defensive against v1-style flat lists
+            items = data
         docs: list[RawDocument] = []
         for item in items:
             doc = _result_to_document(item, self.source_type)

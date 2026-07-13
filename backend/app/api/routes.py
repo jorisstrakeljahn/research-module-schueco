@@ -71,8 +71,8 @@ router = APIRouter()
 
 DEPTH_PROFILES = {
     "quick": {"limit": 30, "rounds": 1, "per_query": 10},
-    "standard": {"limit": 80, "rounds": 1, "per_query": 12},
-    "deep": {"limit": 150, "rounds": 2, "per_query": 20},
+    "standard": {"limit": 100, "rounds": 2, "per_query": 15},
+    "deep": {"limit": 200, "rounds": 3, "per_query": 25},
 }
 TOPIC_GRANULARITY_PROFILES = {
     "compact": {"topic_max": 8, "min_cluster_size": 12},

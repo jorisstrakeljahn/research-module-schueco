@@ -10,11 +10,25 @@ from __future__ import annotations
 
 import json
 import logging
+import re
+from collections import Counter
 from typing import Protocol
 
 from app.llm import get_openai_client
 
 logger = logging.getLogger(__name__)
+
+_WORD = re.compile(r"[a-zA-Z][a-zA-Z-]{3,}")
+_STOPWORDS = frozenset(
+    """
+    with from into over under about their there this that these those which where
+    when what while will would could should shall might must have has had been
+    being also more most less least very much many some such only just than then
+    them they your yours ours mine between among within without across during
+    before after above below again further once here both each other same study
+    review analysis based using towards toward paper article research results
+    """.split()
+)
 
 
 class QueryExpander(Protocol):
@@ -41,6 +55,49 @@ class NoopExpander:
         n: int = 4,
     ) -> list[str]:
         return []
+
+
+class KeywordExpander:
+    """Offline query expansion from document titles (deterministic, no API).
+
+    Counts meaningful adjacent word pairs (bigrams) in the titles found so far and
+    proposes the most frequent ones that have not been searched yet. This lets a
+    multi-round crawl actually go deeper without requiring an LLM key.
+    """
+
+    def expand(
+        self,
+        domain: str,
+        seeds: list[str],
+        context_titles: list[str],
+        already_used: list[str],
+        n: int = 4,
+    ) -> list[str]:
+        used_tokens: set[str] = set()
+        for text in [*already_used, *seeds, domain]:
+            used_tokens |= {w.lower() for w in _WORD.findall(text or "")}
+
+        bigrams: Counter[tuple[str, str]] = Counter()
+        for title in context_titles:
+            words = [
+                w.lower()
+                for w in _WORD.findall(title or "")
+                if w.lower() not in _STOPWORDS
+            ]
+            for left, right in zip(words, words[1:], strict=False):
+                if left == right:
+                    continue
+                bigrams[(left, right)] += 1
+
+        proposals: list[str] = []
+        for (left, right), count in bigrams.most_common():
+            if count < 2 or len(proposals) >= n:
+                break
+            # Skip pairs already covered by previous queries or the seed vocabulary.
+            if left in used_tokens and right in used_tokens:
+                continue
+            proposals.append(f"{left} {right}")
+        return proposals
 
 
 class LLMQueryExpander:
@@ -94,6 +151,8 @@ def get_expander(name: str) -> QueryExpander:
     name = name.lower()
     if name in ("none", "noop", "off"):
         return NoopExpander()
+    if name == "keyword":
+        return KeywordExpander()
     if name == "openai":
         return LLMQueryExpander()
     raise ValueError(f"Unknown expander: {name!r}")
