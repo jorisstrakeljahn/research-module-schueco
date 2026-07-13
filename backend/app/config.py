@@ -41,6 +41,9 @@ class Settings(BaseSettings):
     match_threshold: float = 0.62
     match_review_threshold: float = 0.50
     match_margin: float = 0.08
+    # Cap on brand-new trends surfaced per run (largest topics win). Keeps the
+    # review queue and the pending markers in the UI digestible.
+    max_new_trends_per_run: int = 5
     max_llm_calls: int = 50
 
     # Data sources: comma-separated list of connector names (openalex, arxiv, firecrawl)

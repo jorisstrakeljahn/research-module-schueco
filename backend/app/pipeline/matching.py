@@ -293,8 +293,15 @@ def reconcile_run(
     threshold: float,
     review_threshold: float,
     margin_threshold: float,
+    max_new_trends: int | None = None,
 ) -> list[TrendOccurrence]:
-    """Create occurrences and apply only changes that do not require review."""
+    """Create occurrences and apply only changes that do not require review.
+
+    ``max_new_trends`` caps how many brand-new (unmatched) trends enter the
+    portfolio/review pipeline per run; the largest topics win. Surplus new
+    trends stay visible in the run itself but get no occurrence, so the review
+    queue and the pending markers in the UI stay digestible.
+    """
     trends = list(session.exec(select(Trend).where(Trend.run_id == run_id)).all())
     topics = {topic.id: topic for topic in session.exec(
         select(Topic).where(Topic.run_id == run_id)
@@ -325,6 +332,15 @@ def reconcile_run(
             margin_threshold=margin_threshold,
         )
     }
+    allowed_new_ids: set[int] | None = None
+    if max_new_trends is not None:
+        unmatched = [trend for trend in trends if str(trend.id) not in matches]
+        ranked = sorted(
+            unmatched,
+            key=lambda item: topics[item.topic_id].size,
+            reverse=True,
+        )
+        allowed_new_ids = {item.id for item in ranked[:max_new_trends]}
     occurrences: list[TrendOccurrence] = []
     for trend in trends:
         assessment = session.exec(
@@ -332,6 +348,12 @@ def reconcile_run(
         ).first()
         match = matches.get(str(trend.id))
         canonical = session.get(CanonicalTrend, match.canonical_key) if match else None
+        if (
+            canonical is None
+            and allowed_new_ids is not None
+            and trend.id not in allowed_new_ids
+        ):
+            continue
         current_documents = _documents_for_topic(
             session, run_id, topics[trend.topic_id].topic_index
         )

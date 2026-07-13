@@ -563,6 +563,7 @@ def run_pipeline(
             threshold=settings.match_threshold,
             review_threshold=settings.match_review_threshold,
             margin_threshold=settings.match_margin,
+            max_new_trends=settings.max_new_trends_per_run,
         )
         run.status = "completed"
         run.finished_at = datetime.now(UTC)
