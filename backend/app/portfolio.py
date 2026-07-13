@@ -54,7 +54,7 @@ def record_decision(
     before = {key: getattr(canonical, key) for key in updates}
     before["status"] = canonical.status
 
-    if action == "reject":
+    if action == "reject" and occurrence_id is None:
         canonical.status = "rejected"
     elif action == "restore":
         canonical.status = "active"

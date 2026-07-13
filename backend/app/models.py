@@ -14,7 +14,7 @@ region- and source-type filtering described in the project plan (§7).
 from datetime import UTC, datetime
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import Boolean, Column, Float, Integer, UniqueConstraint, text
+from sqlalchemy import Boolean, Column, Float, Integer, String, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Field, Relationship, SQLModel
 
@@ -41,7 +41,14 @@ SOURCE_TYPES = (
 MATURITY_LEVELS = ("weak_signal", "emerging", "established", "megatrend")
 RADAR_STAGES = ("act", "prepare", "watch")
 PORTFOLIO_STATUSES = ("active", "review", "rejected", "dormant", "merged")
-OCCURRENCE_CHANGES = ("new", "updated", "unchanged", "review")
+OCCURRENCE_CHANGES = (
+    "new",
+    "classification_changed",
+    "content_changed",
+    "evidence_only",
+    "unchanged",
+)
+REVIEW_STATUSES = ("pending", "not_required", "approved", "rejected")
 
 # The six classic PESTEL macro-environment dimensions (Theobald 2016; Keicher 2022),
 # used as the classification label set (ADR-25). Schüco's Trendradar renders these as
@@ -354,18 +361,36 @@ class RunDocument(SQLModel, table=True):
 
 
 class TrendOccurrence(SQLModel, table=True):
-    """One run observation linked to exactly one stable portfolio trend."""
+    """One run observation, linked after its identity has been accepted."""
 
     __tablename__ = "trend_occurrence"
 
     id: int | None = Field(default=None, primary_key=True)
-    canonical_trend_id: str = Field(foreign_key="canonical_trend.id", index=True)
+    canonical_trend_id: str | None = Field(
+        default=None, foreign_key="canonical_trend.id", index=True
+    )
     trend_id: int = Field(foreign_key="trend.id", index=True, unique=True)
     run_id: int = Field(foreign_key="run.id", index=True)
     change_type: str = Field(index=True)
     match_score: float | None = None
     match_margin: float | None = None
     changed_fields: list[str] | None = Field(default=None, sa_column=Column(JSONB))
+    review_status: str = Field(
+        default="not_required",
+        sa_column=Column(
+            String, nullable=False, server_default=text("'not_required'"), index=True
+        ),
+    )
+    review_reasons: list[dict] | None = Field(default=None, sa_column=Column(JSONB))
+    evidence_added_count: int = Field(
+        default=0,
+        sa_column=Column(Integer, nullable=False, server_default=text("0")),
+    )
+    evidence_removed_count: int = Field(
+        default=0,
+        sa_column=Column(Integer, nullable=False, server_default=text("0")),
+    )
+    # Deprecated compatibility projection. New code uses structured review_reasons.
     review_reason: str | None = None
     prevalence: float | None = None
     created_at: datetime = Field(default_factory=_utcnow)

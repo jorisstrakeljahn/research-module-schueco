@@ -20,6 +20,8 @@ class RunOut(BaseModel):
     describer: str | None
     params: dict[str, Any] | None = None
     error: str | None = None
+    change_counts: dict[str, int] = Field(default_factory=dict)
+    review_counts: dict[str, int] = Field(default_factory=dict)
 
 
 class RunProgressEventOut(BaseModel):
@@ -74,7 +76,14 @@ class TrendDetailOut(TrendOut):
 
 
 PortfolioStatus = Literal["active", "review", "rejected", "dormant", "merged"]
-RunDiffKind = Literal["new", "updated", "unchanged", "review"]
+RunDiffKind = Literal[
+    "new",
+    "classification_changed",
+    "content_changed",
+    "evidence_only",
+    "unchanged",
+]
+ReviewStatus = Literal["pending", "not_required", "approved", "rejected"]
 DecisionAction = Literal["confirm", "correct", "reject", "restore", "link", "create", "merge"]
 
 
@@ -155,6 +164,11 @@ class RunDiffEntryOut(BaseModel):
     match_score: float | None = None
     margin: float | None = None
     changed_fields: list[str]
+    review_status: ReviewStatus
+    review_reasons: list[dict[str, Any]] = Field(default_factory=list)
+    evidence_added_count: int = 0
+    evidence_removed_count: int = 0
+    prevalence: float | None = None
     before: dict[str, Any] | None = None
     after: dict[str, Any] | None = None
 
@@ -188,6 +202,13 @@ class ReviewQueueItemOut(BaseModel):
     maturity: str | None = None
     match_score: float | None = None
     margin: float | None = None
+    change_type: RunDiffKind
+    review_status: ReviewStatus
+    review_reasons: list[dict[str, Any]] = Field(default_factory=list)
+    changed_fields: list[str] = Field(default_factory=list)
+    evidence_added_count: int = 0
+    evidence_removed_count: int = 0
+    prevalence: float | None = None
     reason: str | None = None
     suggested_trend: SuggestedTrendOut | None = None
     candidates: list[ReviewCandidateOut] = Field(default_factory=list)
@@ -203,9 +224,10 @@ class PortfolioDecisionIn(BaseModel):
 
 
 class ReviewDecisionIn(BaseModel):
-    action: Literal["link", "create", "reject", "merge"]
+    action: Literal["confirm", "correct", "reject", "link", "create", "merge"]
     reviewer: str = Field(min_length=1)
     reason: str = Field(min_length=1)
+    changes: dict[str, Any] = Field(default_factory=dict)
     canonical_trend_id: str | int | None = None
     target_trend_id: str | int | None = None
     idempotency_key: str = Field(min_length=1)

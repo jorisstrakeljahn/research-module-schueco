@@ -202,5 +202,17 @@ def test_runs_use_cumulative_corpus_dedup_and_embedding_cache(session):
         select(TrendOccurrence).where(TrendOccurrence.run_id == second.id)
     ).all()
     assert occurrences
-    assert all(item.change_type in {"updated", "unchanged", "review"} for item in occurrences)
-    assert session.exec(select(CanonicalTrend)).all()
+    assert all(
+        item.change_type
+        in {
+            "new",
+            "classification_changed",
+            "content_changed",
+            "evidence_only",
+            "unchanged",
+        }
+        for item in occurrences
+    )
+    assert all(item.review_status == "pending" for item in occurrences)
+    assert all(item.canonical_trend_id is None for item in occurrences)
+    assert session.exec(select(CanonicalTrend)).all() == []

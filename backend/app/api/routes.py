@@ -388,8 +388,39 @@ def search_capabilities() -> SearchCapabilitiesOut:
 def list_runs(
     session: Session = Depends(get_session),
     limit: int = Query(default=20, ge=1, le=200),
-) -> list[Run]:
-    return session.exec(select(Run).order_by(Run.id.desc()).limit(limit)).all()
+) -> list[RunOut]:
+    runs = list(session.exec(select(Run).order_by(Run.id.desc()).limit(limit)).all())
+    run_ids = [run.id for run in runs]
+    occurrences = (
+        session.exec(
+            select(TrendOccurrence).where(TrendOccurrence.run_id.in_(run_ids))
+        ).all()
+        if run_ids
+        else []
+    )
+    changes: dict[int, Counter[str]] = {}
+    reviews: dict[int, Counter[str]] = {}
+    for occurrence in occurrences:
+        changes.setdefault(occurrence.run_id, Counter())[occurrence.change_type] += 1
+        reviews.setdefault(occurrence.run_id, Counter())[occurrence.review_status] += 1
+    return [
+        RunOut(
+            id=run.id,
+            status=run.status,
+            started_at=run.started_at,
+            finished_at=run.finished_at,
+            n_documents=run.n_documents,
+            n_topics=run.n_topics,
+            embedder=run.embedder,
+            topic_model=run.topic_model,
+            describer=run.describer,
+            params=run.params,
+            error=run.error,
+            change_counts=dict(changes.get(run.id, {})),
+            review_counts=dict(reviews.get(run.id, {})),
+        )
+        for run in runs
+    ]
 
 
 @router.get("/runs/{run_id}/progress", response_model=RunProgressOut)
@@ -719,7 +750,7 @@ def get_run_diff(run_id: int, session: Session = Depends(get_session)) -> RunDif
                 TrendOccurrence.run_id < occurrence.run_id,
             )
             .order_by(TrendOccurrence.run_id.desc(), TrendOccurrence.id.desc())
-        ).first()
+        ).first() if occurrence.canonical_trend_id is not None else None
         previous_snapshot = _occurrence_snapshot(session, previous) if previous else None
         entries.append(
             RunDiffEntryOut(
@@ -731,6 +762,11 @@ def get_run_diff(run_id: int, session: Session = Depends(get_session)) -> RunDif
                 match_score=occurrence.match_score,
                 margin=occurrence.match_margin,
                 changed_fields=occurrence.changed_fields or [],
+                review_status=occurrence.review_status,
+                review_reasons=occurrence.review_reasons or [],
+                evidence_added_count=occurrence.evidence_added_count,
+                evidence_removed_count=occurrence.evidence_removed_count,
+                prevalence=occurrence.prevalence,
                 before=_snapshot_values(*previous_snapshot) if previous_snapshot else None,
                 after=_snapshot_values(trend, topic, assessment),
             )
@@ -742,9 +778,10 @@ def get_run_diff(run_id: int, session: Session = Depends(get_session)) -> RunDif
         query=(run.params or {}).get("query"),
         counts={
             "new": counted["new"],
-            "updated": counted["updated"],
+            "classification_changed": counted["classification_changed"],
+            "content_changed": counted["content_changed"],
+            "evidence_only": counted["evidence_only"],
             "unchanged": counted["unchanged"],
-            "review": counted["review"],
         },
         entries=entries,
     )
@@ -752,28 +789,45 @@ def get_run_diff(run_id: int, session: Session = Depends(get_session)) -> RunDif
 
 @router.get("/review-queue", response_model=list[ReviewQueueItemOut])
 def list_review_queue(
+    run_id: int | None = Query(default=None),
     session: Session = Depends(get_session),
 ) -> list[ReviewQueueItemOut]:
-    rows = session.exec(
+    query = (
         select(TrendOccurrence, Trend, CanonicalTrend)
         .join(Trend, Trend.id == TrendOccurrence.trend_id)
-        .join(CanonicalTrend, CanonicalTrend.id == TrendOccurrence.canonical_trend_id)
-        .where(TrendOccurrence.change_type == "review")
+        .outerjoin(
+            CanonicalTrend, CanonicalTrend.id == TrendOccurrence.canonical_trend_id
+        )
+        .where(TrendOccurrence.review_status == "pending")
         .order_by(TrendOccurrence.run_id.desc(), TrendOccurrence.id.desc())
-    ).all()
+    )
+    if run_id is not None:
+        query = query.where(TrendOccurrence.run_id == run_id)
+    rows = session.exec(query).all()
     return [
         ReviewQueueItemOut(
             occurrence_id=occurrence.id,
             run_id=occurrence.run_id,
-            canonical_trend_id=canonical.id,
+            canonical_trend_id=canonical.id if canonical else None,
             title=trend.title,
             summary=trend.summary,
             maturity=trend.maturity,
             match_score=occurrence.match_score,
             margin=occurrence.match_margin,
+            change_type=occurrence.change_type,
+            review_status=occurrence.review_status,
+            review_reasons=occurrence.review_reasons or [],
+            changed_fields=occurrence.changed_fields or [],
+            evidence_added_count=occurrence.evidence_added_count,
+            evidence_removed_count=occurrence.evidence_removed_count,
+            prevalence=occurrence.prevalence,
             reason=occurrence.review_reason,
-            suggested_trend=SuggestedTrendOut(
-                id=canonical.id, title=canonical.title, status=canonical.status
+            suggested_trend=(
+                SuggestedTrendOut(
+                    id=canonical.id, title=canonical.title, status=canonical.status
+                )
+                if canonical
+                else None
             ),
         )
         for occurrence, trend, canonical in rows
@@ -831,15 +885,42 @@ def decide_review_item(
     occurrence = session.get(TrendOccurrence, occurrence_id)
     if occurrence is None:
         raise HTTPException(status_code=404, detail="Review occurrence not found")
-    if occurrence.change_type != "review":
+    if occurrence.review_status != "pending":
         raise HTTPException(status_code=409, detail="Review occurrence is already resolved")
     snapshot = _occurrence_snapshot(session, occurrence)
     if snapshot is None:
         raise HTTPException(status_code=409, detail="Occurrence snapshot is unavailable")
     trend, _, assessment = snapshot
     canonical_id = occurrence.canonical_trend_id
-    values: dict[str, Any] = {}
+    proposed = {
+        "title": trend.title,
+        "summary": trend.summary,
+        "maturity": trend.maturity,
+        "pestel": assessment.pestel if assessment else None,
+        "category": assessment.category if assessment else None,
+        "impact": assessment.impact if assessment else None,
+        "urgency": assessment.urgency if assessment else None,
+        "uncertainty": assessment.uncertainty if assessment else None,
+        "radar_stage": assessment.radar_stage if assessment else None,
+    }
+    reason_kinds = {
+        reason.get("kind")
+        for reason in (occurrence.review_reasons or [])
+        if isinstance(reason, dict)
+    }
+    identity_conflict = "identity" in reason_kinds
+    allowed = (
+        {"link", "create", "merge", "reject"}
+        if identity_conflict
+        else {"confirm", "correct", "reject"}
+    )
+    if body.action not in allowed:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Action {body.action} is not valid for this review type",
+        )
 
+    values: dict[str, Any] = {}
     if body.action in {"link", "merge"}:
         requested_id = body.canonical_trend_id or body.target_trend_id
         if requested_id is None:
@@ -852,13 +933,14 @@ def decide_review_item(
         if body.action == "link":
             occurrence.canonical_trend_id = target_id
             canonical_id = target_id
+            values = proposed
         else:
             values["merged_into_id"] = target_id
     elif body.action == "create":
         canonical_id = str(uuid.uuid4())
         canonical = CanonicalTrend(
             id=canonical_id,
-            status="review",
+            status="active",
             title=trend.title,
             summary=trend.summary,
             maturity=trend.maturity,
@@ -874,11 +956,57 @@ def decide_review_item(
         session.add(canonical)
         session.flush()
         occurrence.canonical_trend_id = canonical_id
+        values = proposed
+    elif body.action in {"confirm", "correct"}:
+        values = proposed
+        if body.action == "correct":
+            values.update(body.changes)
+        if canonical_id is None:
+            canonical_id = str(uuid.uuid4())
+            session.add(
+                CanonicalTrend(
+                    id=canonical_id,
+                    status="review",
+                    title=trend.title,
+                    summary=trend.summary,
+                    maturity=trend.maturity,
+                    pestel=assessment.pestel if assessment else None,
+                    category=assessment.category if assessment else None,
+                    impact=assessment.impact if assessment else None,
+                    urgency=assessment.urgency if assessment else None,
+                    uncertainty=assessment.uncertainty if assessment else None,
+                    radar_stage=assessment.radar_stage if assessment else None,
+                    first_run_id=occurrence.run_id,
+                    last_run_id=occurrence.run_id,
+                )
+            )
+            occurrence.canonical_trend_id = canonical_id
+            session.flush()
 
-    occurrence.change_type = "unchanged" if body.action == "reject" else "updated"
-    occurrence.review_reason = None
+    occurrence.review_status = "rejected" if body.action == "reject" else "approved"
     session.add(occurrence)
     session.flush()
+    if body.action == "reject" and canonical_id is None:
+        decision = TrendDecision(
+            canonical_trend_id=None,
+            occurrence_id=occurrence.id,
+            action="reject",
+            reviewer=body.reviewer,
+            reason=body.reason,
+            before_values=None,
+            after_values={"review_status": "rejected"},
+            idempotency_key=body.idempotency_key,
+        )
+        session.add(decision)
+        session.commit()
+        session.refresh(decision)
+        return _decision_out(decision)
+    if canonical_id is None:
+        raise HTTPException(status_code=409, detail="Review identity is unavailable")
+    canonical = session.get(CanonicalTrend, canonical_id)
+    if canonical and body.action != "reject":
+        canonical.last_run_id = occurrence.run_id
+        session.add(canonical)
     try:
         decision = record_decision(
             session,
@@ -895,7 +1023,6 @@ def decide_review_item(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     if body.action == "merge":
         occurrence.canonical_trend_id = str(values["merged_into_id"])
-        occurrence.change_type = "updated"
         session.add(occurrence)
         session.commit()
     return _decision_out(decision)

@@ -141,17 +141,23 @@ def _seed_portfolio(session) -> tuple[CanonicalTrend, CanonicalTrend, TrendOccur
             run_id=first_run.id,
             change_type="new",
             changed_fields=["title", "summary", "maturity"],
+            review_status="approved",
         )
     )
     review = TrendOccurrence(
         canonical_trend_id=canonical.id,
         trend_id=latest.id,
         run_id=second_run.id,
-        change_type="review",
+        change_type="classification_changed",
         match_score=0.74,
         match_margin=0.03,
         changed_fields=["title", "maturity"],
+        review_status="pending",
+        review_reasons=[{"code": "ambiguous_match", "kind": "identity"}],
         review_reason="ambiguous_match",
+        evidence_added_count=2,
+        evidence_removed_count=1,
+        prevalence=0.5,
     )
     session.add(review)
     session.commit()
@@ -195,7 +201,10 @@ def test_portfolio_read_contracts(client, session):
 
     history = client.get(f"/portfolio/trends/{canonical.id}/history").json()
     assert history["trend_id"] == canonical.id
-    assert [point["change_type"] for point in history["points"]] == ["new", "review"]
+    assert [point["change_type"] for point in history["points"]] == [
+        "new",
+        "classification_changed",
+    ]
     assert {evidence["title"] for evidence in history["evidence"]} == {
         "First paper",
         "Latest paper",
@@ -203,7 +212,13 @@ def test_portfolio_read_contracts(client, session):
     assert history["decisions"] == []
 
     diff = client.get(f"/runs/{review.run_id}/diff").json()
-    assert diff["counts"] == {"new": 0, "updated": 0, "unchanged": 0, "review": 1}
+    assert diff["counts"] == {
+        "new": 0,
+        "classification_changed": 1,
+        "content_changed": 0,
+        "evidence_only": 0,
+        "unchanged": 0,
+    }
     assert diff["entries"][0]["before"]["title"] == "Adaptive facades"
     assert diff["entries"][0]["after"]["title"] == "Adaptive building envelopes"
     assert diff["entries"][0]["margin"] == 0.03
@@ -219,6 +234,13 @@ def test_portfolio_read_contracts(client, session):
             "maturity": "established",
             "match_score": 0.74,
             "margin": 0.03,
+            "change_type": "classification_changed",
+            "review_status": "pending",
+            "review_reasons": [{"code": "ambiguous_match", "kind": "identity"}],
+            "changed_fields": ["title", "maturity"],
+            "evidence_added_count": 2,
+            "evidence_removed_count": 1,
+            "prevalence": 0.5,
             "reason": "ambiguous_match",
             "suggested_trend": {
                 "id": canonical.id,
@@ -228,6 +250,91 @@ def test_portfolio_read_contracts(client, session):
             "candidates": [],
         }
     ]
+    assert client.get("/review-queue", params={"run_id": review.run_id - 1}).json() == []
+    run_item = next(item for item in client.get("/runs").json() if item["id"] == review.run_id)
+    assert run_item["change_counts"] == {"classification_changed": 1}
+    assert run_item["review_counts"] == {"pending": 1}
+
+
+@requires_db
+def test_classification_review_confirm_applies_staged_values(client, session):
+    canonical, _, review = _seed_portfolio(session)
+    canonical.title = "Previously approved title"
+    review.review_reasons = [
+        {
+            "code": "material_change",
+            "kind": "classification",
+            "field": "title",
+            "before": canonical.title,
+            "after": "Adaptive building envelopes",
+        }
+    ]
+    review.review_reason = "material_change"
+    session.add(canonical)
+    session.add(review)
+    session.commit()
+
+    response = client.post(
+        f"/review-queue/{review.id}/decision",
+        json={
+            "action": "confirm",
+            "reviewer": "reviewer@example.test",
+            "reason": "Classification is correct",
+            "idempotency_key": "classification-confirm-1",
+        },
+    )
+
+    assert response.status_code == 200
+    session.expire_all()
+    assert session.get(CanonicalTrend, canonical.id).title == "Adaptive building envelopes"
+    assert session.get(TrendOccurrence, review.id).review_status == "approved"
+
+
+@requires_db
+def test_new_trend_is_created_only_after_confirmation(client, session):
+    run = Run(status="completed", n_documents=1, n_topics=1)
+    session.add(run)
+    session.commit()
+    session.refresh(run)
+    trend = _add_snapshot(
+        session,
+        run=run,
+        index=0,
+        title="Novel facade signal",
+        size=1,
+        maturity="weak_signal",
+        evidence_title="Novel evidence",
+    )
+    occurrence = TrendOccurrence(
+        trend_id=trend.id,
+        run_id=run.id,
+        change_type="new",
+        review_status="pending",
+        review_reasons=[{"code": "new_trend", "kind": "classification"}],
+        changed_fields=["title", "summary", "maturity"],
+    )
+    session.add(occurrence)
+    session.commit()
+    session.refresh(occurrence)
+    assert occurrence.canonical_trend_id is None
+
+    response = client.post(
+        f"/review-queue/{occurrence.id}/decision",
+        json={
+            "action": "confirm",
+            "reviewer": "reviewer@example.test",
+            "reason": "Accept new trend",
+            "idempotency_key": "new-confirm-1",
+        },
+    )
+
+    assert response.status_code == 200
+    session.expire_all()
+    resolved = session.get(TrendOccurrence, occurrence.id)
+    assert resolved.review_status == "approved"
+    canonical = session.get(CanonicalTrend, resolved.canonical_trend_id)
+    assert canonical.title == "Novel facade signal"
+    assert canonical.status == "active"
 
 
 @requires_db
@@ -290,8 +397,9 @@ def test_review_actions_resolve_queue_append_only(client, session, action):
 
     session.expire_all()
     resolved = session.get(TrendOccurrence, review.id)
-    assert resolved.change_type in {"updated", "unchanged"}
-    assert resolved.review_reason is None
+    assert resolved.change_type == "classification_changed"
+    assert resolved.review_status in {"approved", "rejected"}
+    assert resolved.review_reason == "ambiguous_match"
     decisions = session.exec(
         select(TrendDecision).where(TrendDecision.occurrence_id == review.id)
     ).all()
@@ -300,7 +408,7 @@ def test_review_actions_resolve_queue_append_only(client, session, action):
 
     source = session.get(CanonicalTrend, canonical.id)
     if action == "reject":
-        assert source.status == "rejected"
+        assert source.status == "active"
     elif action == "merge":
         assert source.status == "merged"
         assert source.merged_into_id == target.id

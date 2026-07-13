@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import uuid
 from dataclasses import dataclass
 
 import numpy as np
@@ -13,6 +12,7 @@ from app.models import (
     CanonicalTrend,
     RunDocument,
     Topic,
+    TopicTimepoint,
     Trend,
     TrendAssessment,
     TrendOccurrence,
@@ -125,7 +125,10 @@ def _documents_for_topic(session: Session, run_id: int, topic_index: int) -> fro
 def _canonical_candidates(session: Session) -> list[MatchCandidate]:
     candidates: list[MatchCandidate] = []
     canonicals = session.exec(
-        select(CanonicalTrend).where(CanonicalTrend.status != "merged")
+        select(CanonicalTrend).where(
+            CanonicalTrend.status != "merged",
+            CanonicalTrend.status != "review",
+        )
     ).all()
     for canonical in canonicals:
         occurrence = session.exec(
@@ -153,6 +156,84 @@ def _canonical_candidates(session: Session) -> list[MatchCandidate]:
     return candidates
 
 
+_ALWAYS_MATERIAL_FIELDS = ("title", "maturity")
+_ALWAYS_MATERIAL_ASSESSMENT_FIELDS = ("pestel", "category", "radar_stage")
+_SCORED_ASSESSMENT_FIELDS = ("impact", "urgency", "uncertainty")
+
+
+def _different(left: object, right: object) -> bool:
+    if isinstance(left, list) and isinstance(right, list):
+        return sorted(left) != sorted(right)
+    return left != right
+
+
+def _score_delta_is_material(left: float | None, right: float | None) -> bool:
+    if left is None or right is None:
+        return left != right
+    return abs(float(left) - float(right)) >= 2
+
+
+def _prevalence_for_topic(session: Session, topic_id: int) -> float | None:
+    point = session.exec(
+        select(TopicTimepoint)
+        .where(TopicTimepoint.topic_id == topic_id)
+        .order_by(TopicTimepoint.period.desc(), TopicTimepoint.id.desc())
+    ).first()
+    return point.prevalence if point else None
+
+
+def _previous_occurrence(
+    session: Session, canonical_id: str, run_id: int
+) -> TrendOccurrence | None:
+    return session.exec(
+        select(TrendOccurrence)
+        .where(
+            TrendOccurrence.canonical_trend_id == canonical_id,
+            TrendOccurrence.run_id < run_id,
+        )
+        .order_by(TrendOccurrence.run_id.desc(), TrendOccurrence.id.desc())
+    ).first()
+
+
+def _review_reason(
+    code: str,
+    *,
+    kind: str,
+    field: str | None = None,
+    before: object = None,
+    after: object = None,
+) -> dict:
+    reason = {"code": code, "kind": kind}
+    if field is not None:
+        reason.update({"field": field, "before": before, "after": after})
+    return reason
+
+
+def _proposed_values(
+    trend: Trend, assessment: TrendAssessment | None
+) -> dict[str, object]:
+    values: dict[str, object] = {
+        "title": trend.title,
+        "summary": trend.summary,
+        "maturity": trend.maturity,
+    }
+    if assessment:
+        values.update(
+            {
+                field: getattr(assessment, field)
+                for field in (
+                    "pestel",
+                    "category",
+                    "impact",
+                    "urgency",
+                    "uncertainty",
+                    "radar_stage",
+                )
+            }
+        )
+    return values
+
+
 def reconcile_run(
     session: Session,
     *,
@@ -161,7 +242,7 @@ def reconcile_run(
     review_threshold: float,
     margin_threshold: float,
 ) -> list[TrendOccurrence]:
-    """Create occurrences and update portfolio values in the caller's transaction."""
+    """Create occurrences and apply only changes that do not require review."""
     trends = list(session.exec(select(Trend).where(Trend.run_id == run_id)).all())
     topics = {topic.id: topic for topic in session.exec(
         select(Topic).where(Topic.run_id == run_id)
@@ -199,70 +280,103 @@ def reconcile_run(
         ).first()
         match = matches.get(str(trend.id))
         canonical = session.get(CanonicalTrend, match.canonical_key) if match else None
+        current_documents = _documents_for_topic(
+            session, run_id, topics[trend.topic_id].topic_index
+        )
+        review_reasons: list[dict] = []
         if canonical is None:
-            canonical = CanonicalTrend(
-                id=str(uuid.uuid5(uuid.NAMESPACE_URL, f"run:{run_id}:trend:{trend.id}")),
-                status="active",
-                title=trend.title,
-                summary=trend.summary,
-                maturity=trend.maturity,
-                first_run_id=run_id,
-                last_run_id=run_id,
-            )
             change_type = "new"
-            changed_fields = ["title", "summary", "maturity"]
-            session.add(canonical)
-            session.flush()
+            changed_fields = list(_proposed_values(trend, assessment))
+            review_reasons.append(_review_reason("new_trend", kind="classification"))
+            previous_documents: frozenset[int] = frozenset()
         else:
+            proposed = _proposed_values(trend, assessment)
             changed_fields = [
                 field
-                for field in ("title", "summary", "maturity")
-                if getattr(canonical, field) != getattr(trend, field)
+                for field, value in proposed.items()
+                if _different(getattr(canonical, field), value)
             ]
-            if assessment:
-                changed_fields.extend(
-                    field
-                    for field in (
-                        "pestel",
-                        "category",
-                        "impact",
-                        "urgency",
-                        "uncertainty",
-                        "radar_stage",
-                    )
-                    if getattr(canonical, field) != getattr(assessment, field)
-                )
-            change_type = (
-                "review"
-                if match.review_reason
-                else ("updated" if changed_fields else "unchanged")
+            material_fields = [
+                field
+                for field in _ALWAYS_MATERIAL_FIELDS
+                if field in changed_fields
+            ]
+            material_fields.extend(
+                field
+                for field in _ALWAYS_MATERIAL_ASSESSMENT_FIELDS
+                if field in changed_fields
             )
-            if not match.review_reason:
-                canonical.title = trend.title
-                canonical.summary = trend.summary
-                canonical.maturity = trend.maturity
+            material_fields.extend(
+                field
+                for field in _SCORED_ASSESSMENT_FIELDS
+                if field in changed_fields
+                and _score_delta_is_material(
+                    getattr(canonical, field), proposed[field]
+                )
+            )
+            if match.review_reason:
+                review_reasons.append(
+                    _review_reason(match.review_reason, kind="identity")
+                )
+            review_reasons.extend(
+                _review_reason(
+                    "material_change",
+                    kind="classification",
+                    field=field,
+                    before=getattr(canonical, field),
+                    after=proposed[field],
+                )
+                for field in material_fields
+            )
+            previous = _previous_occurrence(session, canonical.id, run_id)
+            if previous:
+                previous_trend = session.get(Trend, previous.trend_id)
+                previous_topic = (
+                    session.get(Topic, previous_trend.topic_id) if previous_trend else None
+                )
+                previous_documents = (
+                    _documents_for_topic(
+                        session,
+                        previous.run_id,
+                        previous_topic.topic_index,
+                    )
+                    if previous_topic
+                    else frozenset()
+                )
+            else:
+                previous_documents = frozenset()
+            if material_fields:
+                change_type = "classification_changed"
+            elif changed_fields:
+                change_type = "content_changed"
+            elif current_documents != previous_documents:
+                change_type = "evidence_only"
+            else:
+                change_type = "unchanged"
+            if not review_reasons:
+                for field, value in proposed.items():
+                    setattr(canonical, field, value)
                 canonical.last_run_id = run_id
-        if assessment and (not match or not match.review_reason):
-            for field in (
-                "pestel",
-                "category",
-                "impact",
-                "urgency",
-                "uncertainty",
-                "radar_stage",
-            ):
-                setattr(canonical, field, getattr(assessment, field))
+                canonical.updated_at = trend.created_at
+        evidence_added_count = len(current_documents - previous_documents)
+        evidence_removed_count = len(previous_documents - current_documents)
         occurrence = TrendOccurrence(
-            canonical_trend_id=canonical.id,
+            canonical_trend_id=canonical.id if canonical else None,
             trend_id=trend.id,
             run_id=run_id,
             change_type=change_type,
             match_score=match.score if match else None,
             match_margin=match.margin if match else None,
             changed_fields=changed_fields,
-            review_reason=match.review_reason if match else None,
+            review_status="pending" if review_reasons else "not_required",
+            review_reasons=review_reasons or None,
+            evidence_added_count=evidence_added_count,
+            evidence_removed_count=evidence_removed_count,
+            review_reason=review_reasons[0]["code"] if review_reasons else None,
+            prevalence=_prevalence_for_topic(session, trend.topic_id),
         )
-        session.add(canonical)
+        if canonical:
+            session.add(canonical)
         session.add(occurrence)
         occurrences.append(occurrence)
     session.flush()
