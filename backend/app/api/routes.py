@@ -678,6 +678,22 @@ def start_run(
     }
 
 
+@router.delete("/runs/{run_id}", dependencies=[Depends(require_token)])
+def remove_run(run_id: int, session: Session = Depends(get_session)) -> dict:
+    """Delete a run and roll back everything it introduced (demo/testing).
+
+    Restricted to the most recent run with results, so the portfolio history
+    stays consistent."""
+    from app.run_deletion import RunDeletionError, delete_run
+
+    try:
+        return delete_run(session, run_id)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except RunDeletionError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
 @router.get("/trends", response_model=list[TrendOut])
 def list_trends(
     run_id: int | None = Query(default=None, description="Defaults to latest run"),

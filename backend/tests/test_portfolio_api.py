@@ -610,3 +610,80 @@ def test_portfolio_include_pending_surfaces_unreviewed_results(client, session):
     assert flagged["pending_occurrence_id"] == review.id
     # The curated values still come from the last approved observation.
     assert flagged["size"] == 2
+
+
+@requires_db
+def test_delete_run_rolls_back_everything(client, session):
+    canonical, _, review = _seed_portfolio(session)
+    run, occurrence = _add_pending_new_occurrence(session)
+    canonical_id = canonical.id
+    older_run_id = review.run_id
+    run_id = run.id
+    occurrence_id = occurrence.id
+
+    # Approving the pending item creates a canonical trend tied to this run.
+    approve = client.post(
+        f"/review-queue/{occurrence_id}/decision",
+        json={
+            "action": "confirm",
+            "reviewer": "reviewer@example.test",
+            "reason": "Accept new trend",
+            "idempotency_key": "delete-run-confirm-1",
+        },
+    )
+    assert approve.status_code == 200
+    session.expire_all()
+    created_id = session.get(TrendOccurrence, occurrence_id).canonical_trend_id
+    assert created_id is not None
+
+    # Older runs with newer observations on top cannot be deleted.
+    blocked = client.delete(f"/runs/{older_run_id}")
+    assert blocked.status_code == 409
+
+    response = client.delete(f"/runs/{run_id}")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["deleted_run_id"] == run_id
+    assert body["removed_canonical_trends"] == 1
+
+    session.expire_all()
+    assert session.get(Run, run_id) is None
+    assert session.get(TrendOccurrence, occurrence_id) is None
+    assert session.get(CanonicalTrend, created_id) is None
+    assert session.exec(
+        select(Trend).where(Trend.run_id == run_id)
+    ).first() is None
+    # Pre-existing portfolio data is untouched.
+    assert session.get(CanonicalTrend, canonical_id) is not None
+    listing = client.get(
+        "/portfolio/trends", params={"include_pending": "true"}
+    ).json()
+    assert all(item["id"] != f"pending-{occurrence_id}" for item in listing)
+
+    assert client.delete("/runs/999999").status_code == 404
+
+
+@requires_db
+def test_portfolio_api_validation_and_missing_resources(client, session):
+    canonical, _, review = _seed_portfolio(session)
+    assert client.get("/portfolio/trends/missing").status_code == 404
+    assert client.get("/runs/999999/diff").status_code == 404
+    assert client.post(
+        f"/portfolio/trends/{canonical.id}/decisions",
+        json={
+            "action": "merge",
+            "reviewer": "r",
+            "reason": "invalid",
+            "target_trend_id": canonical.id,
+            "idempotency_key": "self-merge",
+        },
+    ).status_code == 422
+    assert client.post(
+        f"/review-queue/{review.id}/decision",
+        json={
+            "action": "link",
+            "reviewer": "r",
+            "reason": "missing target",
+            "idempotency_key": "missing-target",
+        },
+    ).status_code == 422
