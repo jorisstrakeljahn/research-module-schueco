@@ -54,9 +54,13 @@ export default function RunDetailPage() {
           entry.change_type === "content_changed",
       ),
       evidence: available.filter((entry) => entry.change_type === "evidence_only"),
-      unchanged: available.filter((entry) => entry.change_type === "unchanged"),
     };
   }, [diff]);
+  const hasContent =
+    reviews.length > 0 ||
+    grouped.new.length > 0 ||
+    grouped.reclassified.length > 0 ||
+    grouped.evidence.length > 0;
   const title = diff
     ? t("runDetail.title", {
         date: new Intl.DateTimeFormat(lang, {
@@ -89,38 +93,16 @@ export default function RunDetailPage() {
                   ))}
                 </section>
               )}
-              <TrendGroup
-                title={t("runGroup.new")}
-                entries={grouped.new}
-                minimal={false}
-              />
+              <TrendGroup title={t("runGroup.new")} entries={grouped.new} />
               <TrendGroup
                 title={t("runGroup.reclassified")}
                 entries={grouped.reclassified}
-                minimal={false}
               />
-              <TrendGroup
-                title={t("runGroup.evidence")}
-                entries={grouped.evidence}
-                minimal={false}
-              />
-              {reviews.length === 0 &&
-                grouped.new.length === 0 &&
-                grouped.reclassified.length === 0 &&
-                grouped.evidence.length === 0 && (
-                  <p className="rounded-xl border border-border bg-surface p-5 text-sm text-muted">
-                    {t("runDetail.noMaterialChanges")}
-                  </p>
-                )}
-              {grouped.unchanged.length > 0 && (
-                <details>
-                  <summary className="cursor-pointer list-none text-sm font-medium text-muted hover:text-fg">
-                    {t("runGroup.unchanged")}
-                  </summary>
-                  <div className="mt-3">
-                    <TrendGroup entries={grouped.unchanged} minimal />
-                  </div>
-                </details>
+              <TrendGroup title={t("runGroup.evidence")} entries={grouped.evidence} />
+              {!hasContent && (
+                <p className="rounded-xl border border-border bg-surface p-5 text-sm text-muted">
+                  {t("runDetail.noMaterialChanges")}
+                </p>
               )}
             </div>
           )}
@@ -128,99 +110,77 @@ export default function RunDetailPage() {
       </div>
     </div>
   );
+
   function TrendGroup({
     title,
     entries,
-    minimal,
   }: {
-    title?: string;
+    title: string;
     entries: RunDiffEntry[];
-    minimal: boolean;
   }) {
     if (entries.length === 0) return null;
     return (
       <section className="space-y-3">
-        {title && <h2 className="text-sm font-semibold text-fg">{title}</h2>}
-        <div className="overflow-hidden rounded-xl border border-border bg-surface shadow-sm">
-          <div className="divide-y divide-border">
-            {entries.map((entry) =>
-              minimal ? (
-                <div key={entry.occurrence_id} className="px-4 py-3 sm:px-5">
-                  <TrendTitle entry={entry} />
-                </div>
-              ) : (
-                <TrendDetails key={entry.occurrence_id} entry={entry} />
-              ),
-            )}
-          </div>
+        <h2 className="text-sm font-semibold text-fg">{title}</h2>
+        <div className="grid gap-3 md:grid-cols-2">
+          {entries.map((entry) => (
+            <TrendCard key={entry.occurrence_id} entry={entry} />
+          ))}
         </div>
       </section>
     );
   }
 
-  function TrendDetails({ entry }: { entry: RunDiffEntry }) {
+  function TrendCard({ entry }: { entry: RunDiffEntry }) {
     const summary =
       typeof entry.after?.summary === "string" ? entry.after.summary : null;
-    return (
-      <details className="group p-4 sm:p-5">
-        <summary className="flex cursor-pointer list-none flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <TrendTitle entry={entry} />
-            {summary && <p className="mt-1 line-clamp-2 text-sm text-muted">{summary}</p>}
-          </div>
-        </summary>
-        <div className="mt-4 grid gap-4 border-t border-border pt-4 lg:grid-cols-[1fr_auto]">
-          <div>
-            {entry.changed_fields.length > 0 && (
-              <dl className="grid gap-2 sm:grid-cols-2">
-                {entry.changed_fields.map((field) => (
-                  <div key={field} className="rounded-lg bg-surface-2 p-3">
-                    <dt className="text-xs font-medium text-muted">{t(`field.${field}`)}</dt>
-                    <dd className="mt-1 text-sm text-fg">
-                      {displayValue(entry.before?.[field])}
-                      <span className="mx-2 text-faint">→</span>
-                      {displayValue(entry.after?.[field])}
-                    </dd>
-                  </div>
-                ))}
-              </dl>
-            )}
-          </div>
-          <dl className="grid min-w-48 grid-cols-2 gap-x-5 gap-y-2 text-xs">
-            <Metric label={t("runDetail.evidenceAdded")} value={`+${entry.evidence_added_count}`} />
-            <Metric label={t("runDetail.evidenceRemoved")} value={`−${entry.evidence_removed_count}`} />
-            <Metric
-              label={t("runDetail.prevalenceLabel")}
-              value={entry.prevalence == null ? "–" : `${(entry.prevalence * 100).toFixed(1)}%`}
-            />
-            <Metric
-              label={t("runDetail.match")}
-              value={entry.match_score == null ? "–" : `${(entry.match_score * 100).toFixed(0)}%`}
-            />
-          </dl>
-        </div>
-      </details>
+    const changes = entry.changed_fields.filter(
+      (field) => field !== "summary" && field !== "title",
     );
-  }
-
-  function TrendTitle({ entry }: { entry: RunDiffEntry }) {
-    return entry.canonical_trend_id != null ? (
-      <Link
-        href={`/portfolio/${entry.canonical_trend_id}`}
-        className="font-medium text-fg hover:text-primary"
-      >
-        {entry.title}
-      </Link>
-    ) : (
-      <h3 className="font-medium text-fg">{entry.title}</h3>
+    const body = (
+      <>
+        <h3 className="font-semibold leading-snug text-fg group-hover:text-primary">
+          {entry.title}
+        </h3>
+        {summary && (
+          <p className="mt-1.5 line-clamp-3 text-sm leading-relaxed text-muted">
+            {summary}
+          </p>
+        )}
+        {entry.change_type !== "new" && changes.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {changes.map((field) => (
+              <span
+                key={field}
+                className="rounded-full bg-surface-2 px-2.5 py-1 text-xs text-muted"
+              >
+                {t(`field.${field}`)}: {displayValue(entry.before?.[field])}
+                {" → "}
+                {displayValue(entry.after?.[field])}
+              </span>
+            ))}
+          </div>
+        )}
+        {entry.change_type === "evidence_only" && entry.evidence_added_count > 0 && (
+          <p className="mt-3 text-xs text-faint">
+            {t("runDetail.newDocs", { n: entry.evidence_added_count })}
+          </p>
+        )}
+      </>
     );
-  }
-
-  function Metric({ label, value }: { label: string; value: string }) {
+    if (entry.canonical_trend_id != null) {
+      return (
+        <Link
+          href={`/portfolio/${entry.canonical_trend_id}`}
+          className="group block rounded-xl border border-border bg-surface p-4 shadow-sm transition hover:border-border-strong hover:bg-surface-2 sm:p-5"
+        >
+          {body}
+        </Link>
+      );
+    }
     return (
-      <div>
-        <dt className="text-faint">{label}</dt>
-        <dd className="font-medium tabular-nums text-fg">{value}</dd>
+      <div className="rounded-xl border border-border bg-surface p-4 shadow-sm sm:p-5">
+        {body}
       </div>
     );
   }
@@ -229,6 +189,6 @@ export default function RunDetailPage() {
 function displayValue(value: unknown): string {
   if (value == null) return "–";
   if (Array.isArray(value)) return value.join(", ");
-  if (typeof value === "object") return Object.values(value).join(", ");
+  if (typeof value === "number") return String(Math.round(value * 10) / 10);
   return String(value);
 }

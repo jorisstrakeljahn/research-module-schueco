@@ -218,6 +218,7 @@ export default function ReviewCard({
 function formatValue(value: unknown): string {
   if (value == null) return "–";
   if (Array.isArray(value)) return value.join(", ");
+  if (typeof value === "number") return String(Math.round(value * 10) / 10);
   return String(value);
 }
 

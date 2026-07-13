@@ -4,7 +4,12 @@ import numpy as np
 
 from app.ingestion.base import RawDocument
 from app.pipeline.deduplication import canonicalize_url, identity_for
-from app.pipeline.matching import MatchCandidate, one_to_one_match
+from app.pipeline.matching import (
+    MatchCandidate,
+    one_to_one_match,
+    sanitize_change,
+    values_differ,
+)
 from app.pipeline.timeseries import complete_quarters, stabilize_maturity, topic_prevalence
 
 
@@ -38,6 +43,51 @@ def test_document_identity_normalizes_doi_url_and_content():
     assert identity.normalized_identity == "doi:10.1000/abc"
     assert canonicalize_url(raw.url) == "https://example.com/paper?id=2"
     assert len(identity.content_hash) == 64
+
+
+def test_float_noise_does_not_count_as_change():
+    assert not values_differ(8.0, 8.000353813171387)
+    assert values_differ(8.0, 8.4)
+    assert values_differ(None, 8.0)
+    assert not values_differ(["a", "b"], ["b", "a"])
+
+
+def test_sanitize_change_downgrades_noise_only_diffs():
+    before = {"urgency": 8.0, "uncertainty": 5.0, "summary": "old text"}
+    # Pure float drift collapses to unchanged (or evidence_only with new docs).
+    after_noise = {"urgency": 8.0004, "uncertainty": 5.0005, "summary": "old text"}
+    assert sanitize_change(
+        "classification_changed",
+        ["urgency", "uncertainty"],
+        before,
+        after_noise,
+        evidence_changed=False,
+    ) == ("unchanged", [])
+    assert sanitize_change(
+        "classification_changed",
+        ["urgency", "uncertainty"],
+        before,
+        after_noise,
+        evidence_changed=True,
+    ) == ("evidence_only", [])
+    # A real summary change survives, but is content only.
+    after_summary = dict(after_noise, summary="new text")
+    assert sanitize_change(
+        "classification_changed",
+        ["summary", "urgency"],
+        before,
+        after_summary,
+        evidence_changed=False,
+    ) == ("content_changed", ["summary"])
+    # A material score jump stays a reclassification.
+    after_material = dict(before, urgency=10.0)
+    assert sanitize_change(
+        "classification_changed",
+        ["urgency"],
+        before,
+        after_material,
+        evidence_changed=False,
+    ) == ("classification_changed", ["urgency"])
 
 
 def test_global_matching_is_one_to_one_and_flags_ambiguity():

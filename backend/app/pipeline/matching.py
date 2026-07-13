@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
 import numpy as np
@@ -160,10 +161,21 @@ _ALWAYS_MATERIAL_FIELDS = ("title", "maturity")
 _ALWAYS_MATERIAL_ASSESSMENT_FIELDS = ("pestel", "category", "radar_stage")
 _SCORED_ASSESSMENT_FIELDS = ("impact", "urgency", "uncertainty")
 
+# Recomputed scores drift by tiny floating-point amounts between runs;
+# differences below this tolerance are treated as identical values.
+_NUMERIC_NOISE_TOLERANCE = 0.05
 
-def _different(left: object, right: object) -> bool:
+
+def values_differ(left: object, right: object) -> bool:
     if isinstance(left, list) and isinstance(right, list):
         return sorted(left) != sorted(right)
+    if (
+        isinstance(left, (int, float))
+        and isinstance(right, (int, float))
+        and not isinstance(left, bool)
+        and not isinstance(right, bool)
+    ):
+        return abs(float(left) - float(right)) > _NUMERIC_NOISE_TOLERANCE
     return left != right
 
 
@@ -171,6 +183,45 @@ def _score_delta_is_material(left: float | None, right: float | None) -> bool:
     if left is None or right is None:
         return left != right
     return abs(float(left) - float(right)) >= 2
+
+
+def sanitize_change(
+    change_type: str,
+    changed_fields: Sequence[str],
+    before: Mapping[str, object] | None,
+    after: Mapping[str, object],
+    *,
+    evidence_changed: bool,
+) -> tuple[str, list[str]]:
+    """Drop no-op field diffs (e.g. float noise in stored data) and re-derive the change type."""
+    if change_type not in {"classification_changed", "content_changed"} or before is None:
+        return change_type, list(changed_fields)
+    kept = [
+        field
+        for field in changed_fields
+        if values_differ(before.get(field), after.get(field))
+    ]
+    material = [
+        field
+        for field in kept
+        if field in _ALWAYS_MATERIAL_FIELDS
+        or field in _ALWAYS_MATERIAL_ASSESSMENT_FIELDS
+        or (
+            field in _SCORED_ASSESSMENT_FIELDS
+            and _score_delta_is_material(
+                _as_score(before.get(field)), _as_score(after.get(field))
+            )
+        )
+    ]
+    if material:
+        return "classification_changed", kept
+    if kept:
+        return "content_changed", kept
+    return ("evidence_only" if evidence_changed else "unchanged"), []
+
+
+def _as_score(value: object) -> float | None:
+    return float(value) if isinstance(value, (int, float)) else None
 
 
 def _prevalence_for_topic(session: Session, topic_id: int) -> float | None:
@@ -294,7 +345,7 @@ def reconcile_run(
             changed_fields = [
                 field
                 for field, value in proposed.items()
-                if _different(getattr(canonical, field), value)
+                if values_differ(getattr(canonical, field), value)
             ]
             material_fields = [
                 field
@@ -318,15 +369,17 @@ def reconcile_run(
                 review_reasons.append(
                     _review_reason(match.review_reason, kind="identity")
                 )
+            # Every genuine content change needs a human decision; only
+            # evidence-only updates are applied automatically.
             review_reasons.extend(
                 _review_reason(
-                    "material_change",
+                    "material_change" if field in material_fields else "content_change",
                     kind="classification",
                     field=field,
                     before=getattr(canonical, field),
                     after=proposed[field],
                 )
-                for field in material_fields
+                for field in changed_fields
             )
             previous = _previous_occurrence(session, canonical.id, run_id)
             if previous:

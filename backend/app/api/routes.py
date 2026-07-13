@@ -29,6 +29,7 @@ from app.models import (
     TrendTranslation,
 )
 from app.pestel import build_pestel_analysis
+from app.pipeline.matching import sanitize_change
 from app.portfolio import record_decision
 from app.schemas import (
     EvaluationOut,
@@ -752,23 +753,36 @@ def get_run_diff(run_id: int, session: Session = Depends(get_session)) -> RunDif
             .order_by(TrendOccurrence.run_id.desc(), TrendOccurrence.id.desc())
         ).first() if occurrence.canonical_trend_id is not None else None
         previous_snapshot = _occurrence_snapshot(session, previous) if previous else None
+        before_values = (
+            _snapshot_values(*previous_snapshot) if previous_snapshot else None
+        )
+        after_values = _snapshot_values(trend, topic, assessment)
+        change_type, changed_fields = sanitize_change(
+            occurrence.change_type,
+            occurrence.changed_fields or [],
+            before_values,
+            after_values,
+            evidence_changed=bool(
+                occurrence.evidence_added_count or occurrence.evidence_removed_count
+            ),
+        )
         entries.append(
             RunDiffEntryOut(
                 occurrence_id=occurrence.id,
                 canonical_trend_id=occurrence.canonical_trend_id,
                 trend_id=occurrence.trend_id,
                 title=trend.title,
-                change_type=occurrence.change_type,
+                change_type=change_type,
                 match_score=occurrence.match_score,
                 margin=occurrence.match_margin,
-                changed_fields=occurrence.changed_fields or [],
+                changed_fields=changed_fields,
                 review_status=occurrence.review_status,
                 review_reasons=occurrence.review_reasons or [],
                 evidence_added_count=occurrence.evidence_added_count,
                 evidence_removed_count=occurrence.evidence_removed_count,
                 prevalence=occurrence.prevalence,
-                before=_snapshot_values(*previous_snapshot) if previous_snapshot else None,
-                after=_snapshot_values(trend, topic, assessment),
+                before=before_values,
+                after=after_values,
             )
         )
     counted = Counter(entry.change_type for entry in entries)
