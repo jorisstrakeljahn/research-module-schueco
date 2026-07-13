@@ -57,6 +57,11 @@ export interface PortfolioTrend extends Trend {
   updated_at?: string | null;
   /** Manual drag & drop sort position within the newsfeed column. */
   position?: number | null;
+  /** Unreviewed run result (include_pending): new trend or pending change. */
+  pending_review?: boolean;
+  pending_change_type?: RunDiffKind | null;
+  pending_occurrence_id?: number | null;
+  pending_run_id?: number | null;
 }
 
 export interface TrendEvidence {
@@ -301,10 +306,17 @@ export function fetchSearchCapabilities(): Promise<SearchCapabilities> {
 export function fetchPortfolioTrends(
   status = "active",
   language?: ContentLang,
+  options?: { includePending?: boolean },
 ): Promise<PortfolioTrend[]> {
   return getJSON<
     PortfolioTrend[] | { items?: PortfolioTrend[]; trends?: PortfolioTrend[] }
-  >(`/portfolio/trends${query({ status, language })}`).then(listFrom);
+  >(
+    `/portfolio/trends${query({
+      status,
+      language,
+      include_pending: options?.includePending ? "true" : undefined,
+    })}`,
+  ).then(listFrom);
 }
 
 export function fetchPortfolioTrend(
@@ -348,11 +360,15 @@ export function fetchReviewQueue(
   ).then(listFrom);
 }
 
-async function mutate<T>(path: string, body: unknown): Promise<T> {
+async function mutate<T>(
+  path: string,
+  body: unknown,
+  method: "POST" | "DELETE" = "POST",
+): Promise<T> {
   const res = await fetch(`${BFF_BASE}${path}`, {
-    method: "POST",
+    method,
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    body: body === undefined ? undefined : JSON.stringify(body),
   });
   if (!res.ok) {
     const detail = await res.text();
@@ -426,6 +442,18 @@ export function updatePortfolioOrder(
   items: { id: string | number; position: number }[],
 ): Promise<{ updated: number }> {
   return mutate("/portfolio/order", { items });
+}
+
+export interface RunDeletionResult {
+  deleted_run_id: number;
+  reverted_decisions: number;
+  removed_canonical_trends: number;
+  restored_canonical_trends: number;
+  removed_documents: number;
+}
+
+export function deleteRun(runId: number): Promise<RunDeletionResult> {
+  return mutate(`/runs/${runId}`, undefined, "DELETE");
 }
 
 export function decideReviewItem(
