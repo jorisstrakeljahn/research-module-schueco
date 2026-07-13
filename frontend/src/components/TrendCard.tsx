@@ -2,20 +2,37 @@
 
 import Link from "next/link";
 
-import { CATEGORY_META, RADAR_STAGE_META, type Trend } from "@/lib/api";
+import { CATEGORY_META, RADAR_STAGE_META, type PortfolioTrend, type Trend } from "@/lib/api";
+import { useI18n } from "@/lib/i18n";
 
-export default function TrendCard({ trend }: { trend: Trend }) {
+function isPendingNew(trend: Trend & Partial<PortfolioTrend>): boolean {
+  return Boolean(trend.pending_review) && String(trend.id).startsWith("pending-");
+}
+
+export default function TrendCard({ trend }: { trend: Trend & Partial<PortfolioTrend> }) {
+  const { t } = useI18n();
   const cat = trend.category ? CATEGORY_META[trend.category] : null;
   const stage = trend.radar_stage ? RADAR_STAGE_META[trend.radar_stage] : null;
+  const pending = Boolean(trend.pending_review);
+  const pendingNew = isPendingNew(trend);
+  // Provisional trends have no portfolio page yet; their detail lives in the
+  // run review. Pending changes on known trends keep their portfolio link.
+  const href = pendingNew
+    ? `/runs/${trend.pending_run_id ?? trend.run_id ?? ""}`
+    : `/portfolio/${trend.id}`;
 
   return (
     <div
-      draggable
+      draggable={!pendingNew}
       onDragStart={(e) => {
         e.dataTransfer.setData("text/plain", String(trend.id));
         e.dataTransfer.effectAllowed = "move";
       }}
-      className="cursor-grab rounded-lg border border-border bg-surface p-4 shadow-sm transition-colors hover:border-border-strong active:cursor-grabbing"
+      className={`rounded-lg border bg-surface p-4 shadow-sm transition-colors ${
+        pending
+          ? "border-dashed border-pending/60 bg-pending/5 hover:border-pending"
+          : "border-border hover:border-border-strong"
+      } ${pendingNew ? "" : "cursor-grab active:cursor-grabbing"}`}
     >
       <div className="mb-2 flex items-center gap-2">
         {cat && (
@@ -30,9 +47,14 @@ export default function TrendCard({ trend }: { trend: Trend }) {
             {stage.label}
           </span>
         )}
+        {pending && (
+          <span className="ml-auto shrink-0 rounded-full bg-pending/15 px-2 py-0.5 text-[11px] font-medium text-pending">
+            {t(pendingNew ? "pending.badgeNew" : "pending.badgeChanged")}
+          </span>
+        )}
       </div>
       <Link
-        href={`/portfolio/${trend.id}`}
+        href={href}
         className="block hyphens-auto font-medium leading-snug wrap-break-word text-fg hover:text-primary"
       >
         {trend.title}
@@ -40,6 +62,14 @@ export default function TrendCard({ trend }: { trend: Trend }) {
       <p className="mt-1.5 line-clamp-3 hyphens-auto text-sm leading-relaxed wrap-break-word text-muted">
         {trend.summary}
       </p>
+      {pending && (
+        <Link
+          href={`/runs/${trend.pending_run_id ?? trend.run_id ?? ""}`}
+          className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-pending hover:underline"
+        >
+          {t("pending.reviewCta")} →
+        </Link>
+      )}
     </div>
   );
 }

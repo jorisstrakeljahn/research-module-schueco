@@ -31,6 +31,10 @@
   --color-technology: #7fc241;
   --color-digital: #d0021b;
   --color-markets: #f5a623;
+
+  /* Pending-review accent: theme-aware for readability (green on light,
+     warm yellow on dark). */
+  --color-pending: var(--pending);
 }
 
 /* Light theme (default) */
@@ -48,6 +52,9 @@
   --scrollbar: rgba(15, 23, 42, 0.2);
   --ring-band: rgba(15, 23, 42, 0.04);
   --ring-line: rgba(15, 23, 42, 0.16);
+  /* Green in light mode (readable on white), warm yellow in dark mode.
+     light-dark() follows the color-scheme toggled by next-themes. */
+  --pending: light-dark(#047a45, #f5c542);
 }
 
 /* Dark theme */

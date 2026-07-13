@@ -6,9 +6,15 @@ import {
   CATEGORY_META,
   PESTEL_SECTORS,
   RADAR_STAGE_META,
+  type PortfolioTrend,
   type Trend,
 } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
+
+type RadarTrend = Trend & Partial<Pick<PortfolioTrend, "pending_review">>;
+
+// Theme-aware pending accent (green on light, yellow on dark), see globals.css.
+const PENDING_COLOR = "var(--pending)";
 
 // Schüco-style Trendradar: PESTEL sectors (angle) x Act/Prepare/Watch rings
 // (radius) x thematic category (colour) x corpus share (dot size).
@@ -83,7 +89,7 @@ export default function TrendRadar({
   selectedId,
   onSelect,
 }: {
-  trends: Trend[];
+  trends: RadarTrend[];
   selectedId?: string | number | null;
   onSelect?: (t: Trend) => void;
 }) {
@@ -94,7 +100,7 @@ export default function TrendRadar({
   // Deterministic, collision-avoiding placement: trends sharing a sector+ring
   // cell are fanned out evenly across the sector angle (and staggered in
   // radius) instead of randomly jittered, so dots never pile up on each other.
-  const cells = new Map<string, Trend[]>();
+  const cells = new Map<string, RadarTrend[]>();
   for (const trend of trends) {
     const key = `${sectorIndex(trend)}:${stageRing(trend)}`;
     const bucket = cells.get(key) ?? [];
@@ -119,7 +125,7 @@ export default function TrendRadar({
       const { x, y } = polar(angle, radius);
       const r = 6 + (trend.size / maxSize) * 12;
       const color = CATEGORY_META[trend.category ?? "technology"]?.color ?? "#9ca3af";
-      return { trend, x, y, r, color };
+      return { trend, x, y, r, color, pending: Boolean(trend.pending_review) };
     });
   });
 
@@ -228,30 +234,46 @@ export default function TrendRadar({
         {placed.map((p) => {
           const selected = selectedId === p.trend.id;
           return (
-            <circle
-              key={p.trend.id}
-              cx={p.x}
-              cy={p.y}
-              r={selected ? p.r + 2 : p.r}
-              fill={p.color}
-              fillOpacity={0.9}
-              stroke={selected ? "var(--fg)" : "var(--bg)"}
-              strokeWidth={selected ? 2 : 1.5}
-              className="cursor-pointer transition-all"
-              onClick={() => onSelect?.(p.trend)}
-            >
-              <title>
-                {p.trend.title}
-                {"\n"}
-                {(p.trend.radar_stage ?? "watch").toUpperCase()}
-                {"  "}
-                {CATEGORY_META[p.trend.category ?? "technology"]?.label}
-                {"\n"}
-                {t("field.impact")} {p.trend.impact?.toFixed(1) ?? "–"}
-                {"   "}
-                {t("field.urgency")} {p.trend.urgency?.toFixed(1) ?? "–"}
-              </title>
-            </circle>
+            <g key={p.trend.id}>
+              {/* Pending (unreviewed) trends get a dashed halo so a fresh run
+                  is visually recognisable at a glance. */}
+              {p.pending && (
+                <circle
+                  cx={p.x}
+                  cy={p.y}
+                  r={p.r + 5}
+                  fill="none"
+                  stroke={PENDING_COLOR}
+                  strokeWidth={2}
+                  strokeDasharray="4 3"
+                  className="pointer-events-none animate-pulse"
+                />
+              )}
+              <circle
+                cx={p.x}
+                cy={p.y}
+                r={selected ? p.r + 2 : p.r}
+                fill={p.color}
+                fillOpacity={p.pending ? 0.55 : 0.9}
+                stroke={selected ? "var(--fg)" : "var(--bg)"}
+                strokeWidth={selected ? 2 : 1.5}
+                className="cursor-pointer transition-all"
+                onClick={() => onSelect?.(p.trend)}
+              >
+                <title>
+                  {p.trend.title}
+                  {p.pending ? `\n${t("pending.badgeShort")}` : ""}
+                  {"\n"}
+                  {(p.trend.radar_stage ?? "watch").toUpperCase()}
+                  {"  "}
+                  {CATEGORY_META[p.trend.category ?? "technology"]?.label}
+                  {"\n"}
+                  {t("field.impact")} {p.trend.impact?.toFixed(1) ?? "–"}
+                  {"   "}
+                  {t("field.urgency")} {p.trend.urgency?.toFixed(1) ?? "–"}
+                </title>
+              </circle>
+            </g>
           );
         })}
 
@@ -274,6 +296,22 @@ export default function TrendRadar({
                   {meta.label}
                 </span>
               ))}
+              {trends.some((trend) => trend.pending_review) && (
+                <span
+                  className="flex items-center gap-2"
+                  style={{ fontSize: 14, color: "var(--muted)" }}
+                >
+                  <span
+                    className="inline-block rounded-full"
+                    style={{
+                      width: 11,
+                      height: 11,
+                      border: `2px dashed ${PENDING_COLOR}`,
+                    }}
+                  />
+                  {t("pending.badgeShort")}
+                </span>
+              )}
             </div>
             <div
               className="flex flex-wrap items-center justify-center gap-x-6 gap-y-1"

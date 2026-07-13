@@ -10,13 +10,16 @@ import {
   fetchPortfolioTrends,
   MATURITY_ORDER,
   type Maturity,
+  type PortfolioTrend,
   type Trend,
 } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
+import { useRunProgress } from "@/lib/run-progress";
 
 export default function RadarPage() {
   const { t, lang } = useI18n();
-  const [trends, setTrends] = useState<Trend[]>([]);
+  const { completedCount } = useRunProgress();
+  const [trends, setTrends] = useState<PortfolioTrend[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Trend | null>(null);
@@ -25,11 +28,11 @@ export default function RadarPage() {
   const [region, setRegion] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchPortfolioTrends("active", lang)
+    fetchPortfolioTrends("active", lang, { includePending: true })
       .then(setTrends)
       .catch((e) => setError(String(e)))
       .finally(() => setLoading(false));
-  }, [lang]);
+  }, [lang, completedCount]);
 
   const regions = useMemo(
     () =>

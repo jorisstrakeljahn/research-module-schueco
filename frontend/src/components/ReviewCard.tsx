@@ -127,7 +127,7 @@ export default function ReviewCard({
   }
 
   return (
-    <article className="rounded-xl border border-markets/30 bg-surface p-4 shadow-sm sm:p-5">
+    <article className="rounded-xl border border-pending/30 bg-surface p-4 shadow-sm sm:p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 max-w-3xl">
           <div className="flex flex-wrap items-center gap-2 text-xs text-faint">
@@ -146,7 +146,7 @@ export default function ReviewCard({
             </p>
           )}
         </div>
-        <span className="rounded-full bg-markets/15 px-2.5 py-1 text-xs font-medium text-markets">
+        <span className="rounded-full bg-pending/15 px-2.5 py-1 text-xs font-medium text-pending">
           {t("runGroup.review")}
         </span>
       </div>

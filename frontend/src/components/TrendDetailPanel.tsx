@@ -5,20 +5,25 @@ import Link from "next/link";
 
 import Score from "@/components/Score";
 import TrendBadges from "@/components/TrendBadges";
-import { PESTEL_SECTORS, type Trend } from "@/lib/api";
+import { PESTEL_SECTORS, type PortfolioTrend, type Trend } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 
 export default function TrendDetailPanel({
   trend,
   onClose,
 }: {
-  trend: Trend;
+  trend: Trend & Partial<PortfolioTrend>;
   onClose: () => void;
 }) {
   const { t } = useI18n();
   const sectors = (trend.pestel ?? []).map(
     (k) => PESTEL_SECTORS.find((s) => s.key === k)?.label ?? k,
   );
+  const pendingNew =
+    Boolean(trend.pending_review) && String(trend.id).startsWith("pending-");
+  const detailHref = pendingNew
+    ? `/runs/${trend.pending_run_id ?? trend.run_id ?? ""}`
+    : `/portfolio/${trend.id}`;
 
   return (
     <aside className="flex min-h-0 w-72 shrink-0 flex-col overflow-hidden border-l border-border bg-surface max-lg:fixed max-lg:inset-y-0 max-lg:right-0 max-lg:z-20 max-lg:w-full max-lg:max-w-sm max-lg:shadow-xl xl:w-80 2xl:w-96">
@@ -38,6 +43,11 @@ export default function TrendDetailPanel({
       <div className="flex-1 overflow-auto">
         <div className="space-y-6 px-6 py-6">
           <TrendBadges trend={trend} />
+          {trend.pending_review && (
+            <span className="inline-block rounded-full bg-pending/15 px-3 py-1 text-xs font-medium text-pending">
+              {t(pendingNew ? "pending.badgeNew" : "pending.badgeChanged")}
+            </span>
+          )}
           <h2 className="hyphens-auto text-xl wrap-break-word text-fg">{trend.title}</h2>
           <p className="text-sm text-muted">{trend.summary}</p>
 
@@ -76,10 +86,11 @@ export default function TrendDetailPanel({
           </Field>
 
           <Link
-            href={`/portfolio/${trend.id}`}
+            href={detailHref}
             className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-3 text-white transition-colors hover:bg-primary-bright"
           >
-            {t("detail.fullDetails")} <ArrowUpRight className="h-4 w-4" />
+            {t(pendingNew ? "pending.reviewCta" : "detail.fullDetails")}{" "}
+            <ArrowUpRight className="h-4 w-4" />
           </Link>
           </div>
         </div>

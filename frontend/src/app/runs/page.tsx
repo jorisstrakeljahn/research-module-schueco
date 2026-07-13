@@ -66,7 +66,7 @@ function RunRow({ run }: { run: Run }) {
       </div>
       {run.status === "completed" ? (
         pendingReviews > 0 && (
-          <span className="shrink-0 rounded-full bg-markets/15 px-2.5 py-1 text-xs font-medium text-markets">
+          <span className="shrink-0 rounded-full bg-pending/15 px-2.5 py-1 text-xs font-medium text-pending">
             {t("runs.todo")}
           </span>
         )

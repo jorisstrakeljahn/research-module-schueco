@@ -17,14 +17,20 @@ import {
   type PortfolioTrend,
 } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
+import { useRunProgress } from "@/lib/run-progress";
 
 interface DropTarget {
   maturity: Maturity;
   index: number; // insertion index within the column's visible card list
 }
 
+function isPendingNew(trend: PortfolioTrend): boolean {
+  return Boolean(trend.pending_review) && String(trend.id).startsWith("pending-");
+}
+
 export default function NewsfeedPage() {
   const { t, lang } = useI18n();
+  const { completedCount } = useRunProgress();
   const [trends, setTrends] = useState<PortfolioTrend[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -36,11 +42,11 @@ export default function NewsfeedPage() {
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    fetchPortfolioTrends("active", lang)
+    fetchPortfolioTrends("active", lang, { includePending: true })
       .then(setTrends)
       .catch((e) => setError(String(e)))
       .finally(() => setLoading(false));
-  }, [lang]);
+  }, [lang, completedCount]);
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase();
@@ -58,11 +64,14 @@ export default function NewsfeedPage() {
 
   function persistOrder(next: PortfolioTrend[]) {
     // The whole array order is authoritative; debounce so rapid consecutive
-    // drags collapse into one request.
+    // drags collapse into one request. Provisional (unreviewed) trends have no
+    // portfolio row yet and are excluded from the persisted order.
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
       updatePortfolioOrder(
-        next.map((trend, index) => ({ id: trend.id, position: index })),
+        next
+          .filter((trend) => !isPendingNew(trend))
+          .map((trend, index) => ({ id: trend.id, position: index })),
       ).catch((e) => toast.error(t("newsfeed.toastSaveError"), { description: String(e) }));
     }, 400);
   }
