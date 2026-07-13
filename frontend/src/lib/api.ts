@@ -127,6 +127,8 @@ export interface Run {
   describer: string | null;
   params: Record<string, unknown> | null;
   error: string | null;
+  change_counts: Partial<Record<RunDiffKind, number>>;
+  review_counts: Partial<Record<ReviewStatus, number>>;
 }
 
 export interface RunProgressEvent {
@@ -165,7 +167,22 @@ export interface SearchCapabilities {
   max_documents: number;
 }
 
-export type RunDiffKind = "new" | "updated" | "unchanged" | "review";
+export type RunDiffKind =
+  | "new"
+  | "classification_changed"
+  | "content_changed"
+  | "evidence_only"
+  | "unchanged";
+
+export type ReviewStatus = "pending" | "approved" | "rejected" | "not_required";
+
+export interface ReviewReason {
+  code: string;
+  kind: "identity" | "classification" | string;
+  field?: string;
+  before?: unknown;
+  after?: unknown;
+}
 
 export interface RunDiffEntry {
   occurrence_id: string | number;
@@ -176,6 +193,11 @@ export interface RunDiffEntry {
   match_score: number | null;
   margin: number | null;
   changed_fields: string[];
+  review_status: ReviewStatus;
+  review_reasons: ReviewReason[];
+  evidence_added_count: number;
+  evidence_removed_count: number;
+  prevalence: number | null;
   before?: Record<string, unknown> | null;
   after?: Record<string, unknown> | null;
 }
@@ -197,6 +219,13 @@ export interface ReviewQueueItem {
   maturity: Maturity | null;
   match_score: number | null;
   margin: number | null;
+  change_type: RunDiffKind;
+  review_status: ReviewStatus;
+  review_reasons: ReviewReason[];
+  changed_fields: string[];
+  evidence_added_count: number;
+  evidence_removed_count: number;
+  prevalence: number | null;
   reason: string | null;
   suggested_trend?: Pick<PortfolioTrend, "id" | "title" | "status"> | null;
   candidates?: Array<{
@@ -216,9 +245,10 @@ export interface PortfolioDecisionInput {
 }
 
 export interface ReviewDecisionInput {
-  action: "link" | "create" | "reject" | "merge";
+  action: "confirm" | "correct" | "reject" | "link" | "create" | "merge";
   reviewer: string;
   reason: string;
+  changes?: Record<string, unknown>;
   canonical_trend_id?: string | number;
   target_trend_id?: string | number;
   idempotency_key?: string;
@@ -285,10 +315,11 @@ export function fetchRunProgress(id: number): Promise<RunProgress> {
   return getJSON<RunProgress>(`/runs/${id}/progress`);
 }
 
-export function fetchReviewQueue(): Promise<ReviewQueueItem[]> {
-  return getJSON<ReviewQueueItem[] | { items?: ReviewQueueItem[] }>("/review-queue").then(
-    listFrom,
-  );
+export function fetchReviewQueue(runId?: number): Promise<ReviewQueueItem[]> {
+  const query = runId == null ? "" : `?run_id=${encodeURIComponent(runId)}`;
+  return getJSON<ReviewQueueItem[] | { items?: ReviewQueueItem[] }>(
+    `/review-queue${query}`,
+  ).then(listFrom);
 }
 
 async function mutate<T>(path: string, body: unknown): Promise<T> {

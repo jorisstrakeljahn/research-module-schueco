@@ -260,16 +260,22 @@ export default function SearchProgressModal({
                     {t("search.progress.portfolioResult")}
                   </h3>
                   <div className="mt-3 grid grid-cols-2 gap-2">
-                    {(["new", "updated", "unchanged", "review"] as const).map(
-                      (kind) => (
+                    {(
+                      [
+                        "new",
+                        "classification_changed",
+                        "content_changed",
+                        "evidence_only",
+                        "unchanged",
+                      ] as const
+                    ).map((kind) => (
                         <div key={kind} className="rounded-lg bg-surface p-3">
                           <div className="text-xl font-semibold tabular-nums text-fg">
                             {diff.counts[kind] ?? 0}
                           </div>
                           <div className="text-[11px] text-muted">{t(`diff.${kind}`)}</div>
                         </div>
-                      ),
-                    )}
+                      ))}
                   </div>
                 </div>
               )}

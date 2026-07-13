@@ -1,35 +1,97 @@
 "use client";
 
-import { ArrowLeft, ArrowRight } from "lucide-react";
+import {
+  ArrowLeft,
+  Archive,
+  ClipboardCheck,
+  Files,
+  Sparkles,
+  Tags,
+} from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import ChangeBadge from "@/components/ChangeBadge";
 import PageHeader from "@/components/PageHeader";
-import { fetchRunDiff, type RunDiff, type RunDiffKind } from "@/lib/api";
+import ReviewCard from "@/components/ReviewCard";
+import {
+  fetchReviewQueue,
+  fetchRunDiff,
+  type ReviewQueueItem,
+  type RunDiff,
+  type RunDiffEntry,
+} from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 
-const KINDS: RunDiffKind[] = ["new", "updated", "unchanged", "review"];
+type GroupKey = "review" | "new" | "reclassified" | "evidence" | "unchanged";
+
+const GROUPS = [
+  { key: "review", icon: ClipboardCheck },
+  { key: "new", icon: Sparkles },
+  { key: "reclassified", icon: Tags },
+  { key: "evidence", icon: Files },
+  { key: "unchanged", icon: Archive },
+] as const;
 
 export default function RunDetailPage() {
   const { t, lang } = useI18n();
   const params = useParams<{ id: string }>();
   const runId = Number(params.id);
   const [diff, setDiff] = useState<RunDiff | null>(null);
-  const [selected, setSelected] = useState<RunDiffKind | "all">("all");
+  const [reviews, setReviews] = useState<ReviewQueueItem[]>([]);
+  const [selected, setSelected] = useState<GroupKey | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchRunDiff(runId).then(setDiff).catch((e) => setError(String(e)));
+  const load = useCallback(async () => {
+    try {
+      const [nextDiff, nextReviews] = await Promise.all([
+        fetchRunDiff(runId),
+        fetchReviewQueue(runId),
+      ]);
+      setDiff(nextDiff);
+      setReviews(nextReviews);
+      setSelected((current) =>
+        current === null || (current === "review" && nextReviews.length === 0)
+          ? nextReviews.length > 0
+            ? "review"
+            : "new"
+          : current,
+      );
+      setError(null);
+    } catch (loadError) {
+      setError(String(loadError));
+    }
   }, [runId]);
 
-  const entries = useMemo(
-    () =>
-      diff?.entries.filter((entry) => selected === "all" || entry.change_type === selected) ??
-      [],
-    [diff, selected],
-  );
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const grouped = useMemo(() => {
+    const available = (diff?.entries ?? []).filter(
+      (entry) => entry.review_status !== "pending",
+    );
+    return {
+      review: [],
+      new: available.filter((entry) => entry.change_type === "new"),
+      reclassified: available.filter(
+        (entry) =>
+          entry.change_type === "classification_changed" ||
+          entry.change_type === "content_changed",
+      ),
+      evidence: available.filter((entry) => entry.change_type === "evidence_only"),
+      unchanged: available.filter((entry) => entry.change_type === "unchanged"),
+    } satisfies Record<GroupKey, RunDiffEntry[]>;
+  }, [diff]);
+
+  const counts: Record<GroupKey, number> = {
+    review: reviews.length,
+    new: grouped.new.length,
+    reclassified: grouped.reclassified.length,
+    evidence: grouped.evidence.length,
+    unchanged: grouped.unchanged.length,
+  };
   const title = diff
     ? t("runDetail.title", {
         date: new Intl.DateTimeFormat(lang, {
@@ -42,7 +104,7 @@ export default function RunDetailPage() {
   return (
     <div className="flex h-full min-w-0 flex-col overflow-hidden">
       <PageHeader title={title} subtitle={diff?.query || t("runDetail.subtitle")} />
-      <div className="flex-1 overflow-auto p-6">
+      <div className="flex-1 overflow-auto p-4 sm:p-6">
         <div className="mx-auto max-w-6xl space-y-6">
           <Link href="/runs" className="inline-flex items-center gap-2 text-sm text-muted hover:text-fg">
             <ArrowLeft className="h-4 w-4" /> {t("runDetail.back")}
@@ -54,114 +116,178 @@ export default function RunDetailPage() {
             <p className="text-sm text-muted">{t("runDetail.loading")}</p>
           ) : (
             <>
-              <section className="rounded-xl border border-border bg-surface p-5 shadow-sm">
-                <h2 className="text-sm font-semibold text-fg">{t("runDetail.funnel")}</h2>
-                <div className="mt-4 flex flex-col gap-2 md:flex-row md:items-center">
-                  {KINDS.map((kind, index) => (
-                    <div key={kind} className="contents">
-                      <button
-                        onClick={() => setSelected(kind)}
-                        className={`min-w-0 flex-1 rounded-lg border p-4 text-left transition-colors ${
-                          selected === kind
-                            ? "border-primary bg-primary/5"
-                            : "border-border hover:bg-hover"
-                        }`}
-                      >
-                        <ChangeBadge kind={kind} label={t(`diff.${kind}`)} />
-                        <div className="mt-3 text-2xl font-semibold tabular-nums text-fg">
-                          {diff.counts[kind] ?? 0}
-                        </div>
-                      </button>
-                      {index < KINDS.length - 1 && (
-                        <ArrowRight className="hidden h-4 w-4 shrink-0 text-faint md:block" />
-                      )}
-                    </div>
+              <section>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+                  {GROUPS.map(({ key, icon: Icon }) => (
+                    <button
+                      type="button"
+                      key={key}
+                      onClick={() => setSelected(key)}
+                      className={`rounded-xl border p-3 text-left shadow-sm transition-colors ${
+                        selected === key
+                          ? "border-primary bg-primary/5"
+                          : "border-border bg-surface hover:bg-hover"
+                      } ${key === "review" && counts.review > 0 ? "border-markets/40" : ""}`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <Icon
+                          className={`h-4 w-4 ${
+                            key === "review" && counts.review > 0
+                              ? "text-markets"
+                              : "text-muted"
+                          }`}
+                        />
+                        <span className="text-xl font-semibold tabular-nums text-fg">
+                          {counts[key]}
+                        </span>
+                      </div>
+                      <p className="mt-2 text-xs font-medium text-muted">
+                        {t(`runGroup.${key}`)}
+                      </p>
+                    </button>
                   ))}
                 </div>
               </section>
 
-              <section className="overflow-hidden rounded-xl border border-border bg-surface shadow-sm">
-                <div className="flex items-center justify-between border-b border-border px-5 py-4">
-                  <h2 className="font-semibold text-fg">{t("runDetail.changes")}</h2>
-                  {selected !== "all" && (
-                    <button onClick={() => setSelected("all")} className="text-xs text-primary">
-                      {t("runDetail.showAll")}
-                    </button>
+              {selected === "review" ? (
+                <section className="space-y-4">
+                  {reviews.length === 0 ? (
+                    <EmptyGroup />
+                  ) : (
+                    reviews.map((item) => (
+                      <ReviewCard
+                        key={item.occurrence_id}
+                        item={item}
+                        onResolved={load}
+                      />
+                    ))
                   )}
-                </div>
-                {entries.length === 0 ? (
-                  <p className="p-6 text-sm text-muted">{t("runDetail.noChanges")}</p>
-                ) : (
-                  <div className="divide-y divide-border">
-                    {entries.map((entry) => (
-                      <div key={entry.occurrence_id} className="p-5">
-                        <div className="flex flex-wrap items-start justify-between gap-3">
-                          <div>
-                            {entry.canonical_trend_id != null ? (
-                              <Link
-                                href={`/portfolio/${entry.canonical_trend_id}`}
-                                className="font-medium text-fg hover:text-primary"
-                              >
-                                {entry.title}
-                              </Link>
-                            ) : (
-                              <h3 className="font-medium text-fg">{entry.title}</h3>
-                            )}
-                            {entry.changed_fields.length > 0 && (
-                              <p className="mt-1 text-xs text-muted">
-                                {t("runDetail.fields")}: {entry.changed_fields.join(", ")}
-                              </p>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-3">
-                            {entry.match_score != null && (
-                              <span className="text-xs tabular-nums text-faint">
-                                {t("runDetail.match")} {(entry.match_score * 100).toFixed(0)}%
-                              </span>
-                            )}
-                            <ChangeBadge
-                              kind={entry.change_type}
-                              label={t(`diff.${entry.change_type}`)}
-                            />
-                          </div>
-                        </div>
-                        {(entry.before || entry.after) && (
-                          <div className="mt-4 grid gap-3 md:grid-cols-2">
-                            <Snapshot label={t("runDetail.before")} value={entry.before} />
-                            <Snapshot label={t("runDetail.after")} value={entry.after} />
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </section>
+                </section>
+              ) : selected ? (
+                <TrendGroup entries={grouped[selected]} minimal={selected === "unchanged"} />
+              ) : null}
             </>
           )}
         </div>
       </div>
     </div>
   );
+  function EmptyGroup() {
+    return (
+      <div className="rounded-xl border border-dashed border-border bg-surface p-8 text-center text-sm text-muted">
+        {t("runDetail.noChanges")}
+      </div>
+    );
+  }
+
+  function TrendGroup({
+    entries,
+    minimal,
+  }: {
+    entries: RunDiffEntry[];
+    minimal: boolean;
+  }) {
+    if (entries.length === 0) return <EmptyGroup />;
+    return (
+      <section className="overflow-hidden rounded-xl border border-border bg-surface shadow-sm">
+        <div className="divide-y divide-border">
+          {entries.map((entry) =>
+            minimal ? (
+              <div
+                key={entry.occurrence_id}
+                className="flex items-center justify-between gap-3 px-4 py-3 sm:px-5"
+              >
+                <TrendTitle entry={entry} />
+                <span className="text-xs text-faint">
+                  {t("runDetail.prevalence", {
+                    n: entry.prevalence == null ? "–" : `${(entry.prevalence * 100).toFixed(1)}%`,
+                  })}
+                </span>
+              </div>
+            ) : (
+              <TrendDetails key={entry.occurrence_id} entry={entry} />
+            ),
+          )}
+        </div>
+      </section>
+    );
+  }
+
+  function TrendDetails({ entry }: { entry: RunDiffEntry }) {
+    const summary =
+      typeof entry.after?.summary === "string" ? entry.after.summary : null;
+    return (
+      <details className="group p-4 sm:p-5">
+        <summary className="flex cursor-pointer list-none flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <TrendTitle entry={entry} />
+            {summary && <p className="mt-1 line-clamp-2 text-sm text-muted">{summary}</p>}
+          </div>
+          <ChangeBadge
+            kind={entry.change_type}
+            label={t(`diff.${entry.change_type}`)}
+          />
+        </summary>
+        <div className="mt-4 grid gap-4 border-t border-border pt-4 lg:grid-cols-[1fr_auto]">
+          <div>
+            {entry.changed_fields.length > 0 && (
+              <dl className="grid gap-2 sm:grid-cols-2">
+                {entry.changed_fields.map((field) => (
+                  <div key={field} className="rounded-lg bg-surface-2 p-3">
+                    <dt className="text-xs font-medium text-muted">{t(`field.${field}`)}</dt>
+                    <dd className="mt-1 text-sm text-fg">
+                      {displayValue(entry.before?.[field])}
+                      <span className="mx-2 text-faint">→</span>
+                      {displayValue(entry.after?.[field])}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+          </div>
+          <dl className="grid min-w-48 grid-cols-2 gap-x-5 gap-y-2 text-xs">
+            <Metric label={t("runDetail.evidenceAdded")} value={`+${entry.evidence_added_count}`} />
+            <Metric label={t("runDetail.evidenceRemoved")} value={`−${entry.evidence_removed_count}`} />
+            <Metric
+              label={t("runDetail.prevalenceLabel")}
+              value={entry.prevalence == null ? "–" : `${(entry.prevalence * 100).toFixed(1)}%`}
+            />
+            <Metric
+              label={t("runDetail.match")}
+              value={entry.match_score == null ? "–" : `${(entry.match_score * 100).toFixed(0)}%`}
+            />
+          </dl>
+        </div>
+      </details>
+    );
+  }
+
+  function TrendTitle({ entry }: { entry: RunDiffEntry }) {
+    return entry.canonical_trend_id != null ? (
+      <Link
+        href={`/portfolio/${entry.canonical_trend_id}`}
+        className="font-medium text-fg hover:text-primary"
+      >
+        {entry.title}
+      </Link>
+    ) : (
+      <h3 className="font-medium text-fg">{entry.title}</h3>
+    );
+  }
+
+  function Metric({ label, value }: { label: string; value: string }) {
+    return (
+      <div>
+        <dt className="text-faint">{label}</dt>
+        <dd className="font-medium tabular-nums text-fg">{value}</dd>
+      </div>
+    );
+  }
 }
 
-function Snapshot({
-  label,
-  value,
-}: {
-  label: string;
-  value: Record<string, unknown> | null | undefined;
-}) {
-  return (
-    <div className="rounded-lg bg-surface-2 p-3">
-      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-faint">{label}</p>
-      <dl className="space-y-1 text-xs">
-        {Object.entries(value ?? {}).map(([key, item]) => (
-          <div key={key} className="flex gap-2">
-            <dt className="text-muted">{key}</dt>
-            <dd className="ml-auto max-w-[65%] truncate text-right text-fg">{String(item)}</dd>
-          </div>
-        ))}
-      </dl>
-    </div>
-  );
+function displayValue(value: unknown): string {
+  if (value == null) return "–";
+  if (Array.isArray(value)) return value.join(", ");
+  if (typeof value === "object") return Object.values(value).join(", ");
+  return String(value);
 }

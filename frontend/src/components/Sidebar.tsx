@@ -7,7 +7,6 @@ import {
   LayoutDashboard,
   Radar,
   Rss,
-  ScanSearch,
   Settings,
 } from "lucide-react";
 import Link from "next/link";
@@ -23,7 +22,6 @@ const NAV = [
   { href: "/newsfeed", labelKey: "nav.newsfeed", icon: Rss },
   { href: "/radar", labelKey: "nav.radar", icon: Radar },
   { href: "/runs", labelKey: "nav.runs", icon: GitCompareArrows },
-  { href: "/review", labelKey: "nav.review", icon: ScanSearch },
   { href: "/settings", labelKey: "nav.settings", icon: Settings },
 ];
 

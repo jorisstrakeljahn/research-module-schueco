@@ -203,8 +203,16 @@ export default function DashboardPage() {
 
       {runDiff && (
         <Panel title={t("dashboard.panel.lastDiff")}>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {(["new", "updated", "unchanged", "review"] as const).map((kind) => (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+            {(
+              [
+                "new",
+                "classification_changed",
+                "content_changed",
+                "evidence_only",
+                "unchanged",
+              ] as const
+            ).map((kind) => (
               <Link
                 key={kind}
                 href={`/runs/${runDiff.run_id}`}
