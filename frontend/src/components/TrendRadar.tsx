@@ -15,9 +15,9 @@ import { useI18n } from "@/lib/i18n";
 
 const SIZE = 720;
 const C = SIZE / 2;
-const MAX_R = 308;
-const PAD = 92; // breathing room so sector labels are never clipped
-const MAX_CHART_PX = 920;
+const MAX_R = 330;
+const PAD = 64; // breathing room so sector labels are never clipped
+const MAX_CHART_PX = 1080;
 const MIN_CHART_PX = 300;
 const N_SECTORS = PESTEL_SECTORS.length;
 const SECTOR_DEG = 360 / N_SECTORS;
@@ -150,10 +150,10 @@ export default function TrendRadar({
   }
 
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-hidden xl:flex-row xl:items-stretch xl:gap-4">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
       <div
         ref={chartRef}
-        className="flex min-h-[min(480px,58dvh)] min-w-0 flex-1 items-center justify-center overflow-hidden xl:min-h-0"
+        className="flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-hidden"
       >
         <svg
           viewBox={`${-PAD} ${-PAD} ${SIZE + 2 * PAD} ${SIZE + 2 * PAD}`}
@@ -192,7 +192,7 @@ export default function TrendRadar({
         })}
 
         {PESTEL_SECTORS.map((s, i) => {
-          const { x, y } = polar(i * SECTOR_DEG + SECTOR_DEG / 2, MAX_R + 30);
+          const { x, y } = polar(i * SECTOR_DEG + SECTOR_DEG / 2, MAX_R + 26);
           return (
             <text
               key={s.key}
@@ -254,40 +254,44 @@ export default function TrendRadar({
             </circle>
           );
         })}
-        </svg>
-      </div>
 
-      <div className="min-w-0 shrink-0 space-y-3 overflow-auto border-t border-border pt-3 text-xs xl:w-44 xl:border-l xl:border-t-0 xl:pl-5 xl:pt-0">
-        <div>
-          <p className="mb-2 font-medium uppercase tracking-wider text-faint">
-            {t("radar.legend.category")}
-          </p>
-          <ul className="space-y-1.5">
-            {Object.entries(CATEGORY_META).map(([key, meta]) => (
-              <li key={key} className="flex items-center gap-2 text-muted">
+        {/* Legends are part of the chart itself so the radar can use the full
+            width; foreignObject gives us robust text layout that scales with
+            the SVG. */}
+        <foreignObject x={-PAD} y={C + MAX_R + 8} width={SIZE + 2 * PAD} height={PAD + (SIZE - C - MAX_R) - 8}>
+          <div className="flex h-full flex-col items-center justify-end gap-2.5 text-center">
+            <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-1">
+              {Object.entries(CATEGORY_META).map(([key, meta]) => (
                 <span
-                  className="h-2.5 w-2.5 rounded-full"
-                  style={{ backgroundColor: meta.color }}
-                />
-                {meta.label}
-              </li>
-            ))}
-          </ul>
-        </div>
-        <div>
-          <p className="mb-2 font-medium uppercase tracking-wider text-faint">
-            {t("radar.legend.ring")}
-          </p>
-          <ul className="space-y-2">
-            {(["act", "prepare", "watch"] as const).map((ring) => (
-              <li key={ring}>
-                <span className="text-fg">{t(`radar.ring.${ring}`)}</span>
-                <span className="ml-2 text-faint">{t(`radar.ring.${ring}Desc`)}</span>
-              </li>
-            ))}
-          </ul>
-          <p className="mt-3 text-faint">{t("radar.legend.size")}</p>
-        </div>
+                  key={key}
+                  className="flex items-center gap-2"
+                  style={{ fontSize: 14, color: "var(--muted)" }}
+                >
+                  <span
+                    className="inline-block rounded-full"
+                    style={{ width: 11, height: 11, backgroundColor: meta.color }}
+                  />
+                  {meta.label}
+                </span>
+              ))}
+            </div>
+            <div
+              className="flex flex-wrap items-center justify-center gap-x-6 gap-y-1"
+              style={{ fontSize: 13, color: "var(--faint)" }}
+            >
+              {(["act", "prepare", "watch"] as const).map((ring) => (
+                <span key={ring}>
+                  <span style={{ color: "var(--fg)", fontWeight: 600 }}>
+                    {t(`radar.ring.${ring}`)}
+                  </span>{" "}
+                  · {t(`radar.ring.${ring}Desc`)}
+                </span>
+              ))}
+              <span>{t("radar.legend.size")}</span>
+            </div>
+          </div>
+        </foreignObject>
+        </svg>
       </div>
     </div>
   );
