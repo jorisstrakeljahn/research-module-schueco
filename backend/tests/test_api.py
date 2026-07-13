@@ -333,8 +333,9 @@ def test_translate_is_cached(client, session, monkeypatch):
             )
 
     stub = _CountingTranslator()
+    # routes.py binds resolve_translator at import time, so patch that reference.
     monkeypatch.setattr(
-        "app.pipeline.translate.resolve_translator", lambda settings: stub
+        "app.api.routes.resolve_translator", lambda settings: stub
     )
 
     first = client.post(f"/trends/{trend.id}/translate", json={"language": "de"})

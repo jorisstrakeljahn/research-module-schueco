@@ -22,7 +22,7 @@ const MIN_CHART_PX = 300;
 const N_SECTORS = PESTEL_SECTORS.length;
 const SECTOR_DEG = 360 / N_SECTORS;
 const RING_BANDS: Record<number, [number, number]> = {
-  0: [0.06, 0.36], // Act
+  0: [0.14, 0.36], // Act (starts away from the dead center so dots stay legible)
   1: [0.4, 0.66], // Prepare
   2: [0.7, 0.98], // Watch
 };
@@ -91,16 +91,63 @@ export default function TrendRadar({
   const { ref: chartRef, size: chartSize } = useChartSize();
   const maxSize = Math.max(1, ...trends.map((t) => t.size));
 
-  const placed = trends.map((t) => {
-    const sec = sectorIndex(t);
-    const [inner, outer] = RING_BANDS[stageRing(t)];
-    const angle = sec * SECTOR_DEG + (0.2 + 0.6 * jitter(t.id, 1)) * SECTOR_DEG;
-    const radius = (inner + (outer - inner) * jitter(t.id, 2)) * MAX_R;
-    const { x, y } = polar(angle, radius);
-    const r = 6 + (t.size / maxSize) * 12;
-    const color = CATEGORY_META[t.category ?? "technology"]?.color ?? "#9ca3af";
-    return { trend: t, x, y, r, color };
+  // Deterministic, collision-avoiding placement: trends sharing a sector+ring
+  // cell are fanned out evenly across the sector angle (and staggered in
+  // radius) instead of randomly jittered, so dots never pile up on each other.
+  const cells = new Map<string, Trend[]>();
+  for (const trend of trends) {
+    const key = `${sectorIndex(trend)}:${stageRing(trend)}`;
+    const bucket = cells.get(key) ?? [];
+    bucket.push(trend);
+    cells.set(key, bucket);
+  }
+  const placed = [...cells.entries()].flatMap(([key, bucket]) => {
+    const [sec, ring] = key.split(":").map(Number);
+    const [inner, outer] = RING_BANDS[ring];
+    // Big dots go to the outer edge of the band where there is more arc length.
+    const sorted = [...bucket].sort(
+      (a, b) => a.size - b.size || idSeed(a.id) - idSeed(b.id),
+    );
+    return sorted.map((trend, index) => {
+      const step = 1 / (sorted.length + 1);
+      const angleFrac = step * (index + 1);
+      const angle = sec * SECTOR_DEG + (0.06 + 0.88 * angleFrac) * SECTOR_DEG;
+      // Spread evenly across the band radius as well (spiral-like fan).
+      const radialFrac =
+        sorted.length === 1 ? 0.5 : 0.12 + 0.76 * ((index + 0.5) / sorted.length);
+      const radius = (inner + (outer - inner) * radialFrac) * MAX_R;
+      const { x, y } = polar(angle, radius);
+      const r = 6 + (trend.size / maxSize) * 12;
+      const color = CATEGORY_META[trend.category ?? "technology"]?.color ?? "#9ca3af";
+      return { trend, x, y, r, color };
+    });
   });
+
+  // Final safety pass: nudge any two dots apart until nothing overlaps. The
+  // displacement stays small (a few px), so sector/ring semantics are kept.
+  for (let iteration = 0; iteration < 40; iteration++) {
+    let moved = false;
+    for (let i = 0; i < placed.length; i++) {
+      for (let j = i + 1; j < placed.length; j++) {
+        const a = placed[i];
+        const b = placed[j];
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const dist = Math.hypot(dx, dy) || 0.001;
+        const minDist = a.r + b.r + 3;
+        if (dist >= minDist) continue;
+        const push = (minDist - dist) / 2;
+        const ux = dx / dist;
+        const uy = dy / dist;
+        a.x -= ux * push;
+        a.y -= uy * push;
+        b.x += ux * push;
+        b.y += uy * push;
+        moved = true;
+      }
+    }
+    if (!moved) break;
+  }
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-hidden xl:flex-row xl:items-stretch xl:gap-4">

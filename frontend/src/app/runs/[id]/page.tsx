@@ -27,8 +27,8 @@ export default function RunDetailPage() {
   const load = useCallback(async () => {
     try {
       const [nextDiff, nextReviews] = await Promise.all([
-        fetchRunDiff(runId),
-        fetchReviewQueue(runId),
+        fetchRunDiff(runId, lang),
+        fetchReviewQueue(runId, lang),
       ]);
       setDiff(nextDiff);
       setReviews(nextReviews);
@@ -36,7 +36,7 @@ export default function RunDetailPage() {
     } catch (loadError) {
       setError(String(loadError));
     }
-  }, [runId]);
+  }, [runId, lang]);
 
   useEffect(() => {
     void load();

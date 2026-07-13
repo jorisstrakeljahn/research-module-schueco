@@ -41,27 +41,27 @@ export default function DashboardPage() {
   const terminalHandledRef = useRef<number | null>(null);
 
   const reload = useCallback(() => {
-    fetchPortfolioTrends("active").then(setTrends).catch((e) => setError(String(e)));
+    fetchPortfolioTrends("active", lang).then(setTrends).catch((e) => setError(String(e)));
     fetchRuns()
       .then((runs) => {
         const latest = runs[0] ?? null;
         setRun(latest);
-        if (latest) fetchRunDiff(latest.id).then(setRunDiff).catch(() => setRunDiff(null));
+        if (latest) fetchRunDiff(latest.id, lang).then(setRunDiff).catch(() => setRunDiff(null));
       })
       .catch(() => setRun(null));
-  }, []);
+  }, [lang]);
 
   useEffect(() => {
-    Promise.all([fetchPortfolioTrends("active"), fetchRuns()])
+    Promise.all([fetchPortfolioTrends("active", lang), fetchRuns()])
       .then(([trendList, runs]) => {
         setTrends(trendList);
         const latest = runs[0] ?? null;
         setRun(latest);
-        if (latest) fetchRunDiff(latest.id).then(setRunDiff).catch(() => setRunDiff(null));
+        if (latest) fetchRunDiff(latest.id, lang).then(setRunDiff).catch(() => setRunDiff(null));
       })
       .catch((e) => setError(String(e)))
       .finally(() => setLoading(false));
-  }, []);
+  }, [lang]);
 
   useEffect(() => {
     if (activeRunId == null) return;
@@ -79,7 +79,7 @@ export default function DashboardPage() {
           if (terminalHandledRef.current !== runId) {
             terminalHandledRef.current = runId;
             if (next.status === "completed") {
-              const diff = await fetchRunDiff(runId);
+              const diff = await fetchRunDiff(runId, lang);
               if (cancelled) return;
               setActiveDiff(diff);
               reload();
@@ -108,7 +108,7 @@ export default function DashboardPage() {
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-  }, [activeRunId, reload, t]);
+  }, [activeRunId, reload, t, lang]);
 
   function handleStarted(result: {
     run_id: number;

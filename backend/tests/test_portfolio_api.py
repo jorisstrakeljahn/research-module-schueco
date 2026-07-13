@@ -257,6 +257,40 @@ def test_portfolio_read_contracts(client, session):
 
 
 @requires_db
+def test_portfolio_serves_requested_language(client, session):
+    canonical, _, _ = _seed_portfolio(session)
+    canonical.translations = {
+        "de": {
+            "title": "Adaptive Gebäudehüllen",
+            "summary": "Deutsche Zusammenfassung",
+            "rationale": "Deutsche Begründung",
+        },
+        "en": {
+            "title": canonical.title,
+            "summary": canonical.summary,
+            "rationale": "English rationale",
+        },
+    }
+    session.add(canonical)
+    session.commit()
+
+    german = client.get("/portfolio/trends", params={"language": "de"}).json()
+    item = next(entry for entry in german if entry["id"] == canonical.id)
+    assert item["title"] == "Adaptive Gebäudehüllen"
+    assert item["summary"] == "Deutsche Zusammenfassung"
+
+    detail = client.get(
+        f"/portfolio/trends/{canonical.id}", params={"language": "de"}
+    ).json()
+    assert detail["title"] == "Adaptive Gebäudehüllen"
+    assert detail["rationale"] == "Deutsche Begründung"
+
+    # Unknown/missing language falls back to the curated base text.
+    english = client.get(f"/portfolio/trends/{canonical.id}").json()
+    assert english["title"] == canonical.title
+
+
+@requires_db
 def test_classification_review_confirm_applies_staged_values(client, session):
     canonical, _, review = _seed_portfolio(session)
     canonical.title = "Previously approved title"

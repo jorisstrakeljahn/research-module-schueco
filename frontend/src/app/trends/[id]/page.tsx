@@ -48,10 +48,10 @@ export default function TrendDetailPage() {
   const [translating, setTranslating] = useState(false);
 
   useEffect(() => {
-    fetchTrend(trendId)
+    fetchTrend(trendId, lang)
       .then(setTrend)
       .catch((e) => setError(String(e)));
-  }, [trendId]);
+  }, [trendId, lang]);
 
   async function doTranslate() {
     if (override) {

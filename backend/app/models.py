@@ -336,6 +336,10 @@ class CanonicalTrend(SQLModel, table=True):
     urgency: float | None = None
     uncertainty: float | None = None
     radar_stage: str | None = None
+    # Full bilingual text: {"de": {"title","summary","rationale"}, "en": {...}}.
+    # ``title``/``summary`` above stay the curation default; the API serves the
+    # requested language from here so DE and EN views are both first-class.
+    translations: dict | None = Field(default=None, sa_column=Column(JSONB))
     first_run_id: int | None = Field(default=None, foreign_key="run.id", index=True)
     last_run_id: int | None = Field(default=None, foreign_key="run.id", index=True)
     merged_into_id: str | None = Field(default=None, foreign_key="canonical_trend.id")

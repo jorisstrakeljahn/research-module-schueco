@@ -81,6 +81,41 @@ class OpenAITranslator:
         )
 
 
+SUPPORTED_LANGUAGES = ("de", "en")
+
+
+def translations_for_trend(
+    session,
+    trend_id: int,
+    *,
+    fallback_title: str,
+    fallback_summary: str,
+    fallback_rationale: str | None = None,
+) -> dict:
+    """Build the bilingual ``{"de": {...}, "en": {...}}`` payload for a trend.
+
+    Reads the persisted :class:`~app.models.TrendTranslation` rows; any missing
+    language falls back to the trend's base text so callers always get both keys.
+    """
+    from sqlmodel import select
+
+    from app.models import TrendTranslation
+
+    rows = session.exec(
+        select(TrendTranslation).where(TrendTranslation.trend_id == trend_id)
+    ).all()
+    by_language = {row.language: row for row in rows}
+    payload: dict = {}
+    for language in SUPPORTED_LANGUAGES:
+        row = by_language.get(language)
+        payload[language] = {
+            "title": row.title if row else fallback_title,
+            "summary": row.summary if row else fallback_summary,
+            "rationale": (row.rationale if row else None) or fallback_rationale,
+        }
+    return payload
+
+
 def get_translator(name: str) -> Translator:
     """Factory: resolve a translator by name (``openai`` | ``none``)."""
     name = (name or "").lower()

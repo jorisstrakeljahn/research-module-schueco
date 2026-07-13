@@ -18,6 +18,7 @@ from app.models import (
     TrendAssessment,
     TrendOccurrence,
 )
+from app.pipeline.translate import translations_for_trend
 
 
 @dataclass(frozen=True)
@@ -409,6 +410,13 @@ def reconcile_run(
             if not review_reasons:
                 for field, value in proposed.items():
                     setattr(canonical, field, value)
+                canonical.translations = translations_for_trend(
+                    session,
+                    trend.id,
+                    fallback_title=trend.title,
+                    fallback_summary=trend.summary,
+                    fallback_rationale=assessment.rationale if assessment else None,
+                )
                 canonical.last_run_id = run_id
                 canonical.updated_at = trend.created_at
         evidence_added_count = len(current_documents - previous_documents)

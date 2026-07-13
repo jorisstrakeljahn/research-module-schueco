@@ -33,7 +33,7 @@ export default function ReviewCard({
   item: ReviewQueueItem;
   onResolved: () => void | Promise<void>;
 }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const identityReview = item.review_reasons.some((reason) => reason.kind === "identity");
   const actions = useMemo<Action[]>(() => {
     const all: Action[] = ["confirm", "correct", "link", "create", "merge", "reject"];
@@ -99,6 +99,7 @@ export default function ReviewCard({
         action,
         reviewer: reviewer.trim(),
         reason: reason.trim(),
+        language: lang,
         canonical_trend_id: action === "link" ? target.trim() : undefined,
         target_trend_id: action === "merge" ? target.trim() : undefined,
         changes:

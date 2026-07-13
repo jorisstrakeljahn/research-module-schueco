@@ -25,7 +25,7 @@ import {
 import { useI18n } from "@/lib/i18n";
 
 export default function PortfolioTrendPage() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const params = useParams<{ id: string }>();
   const [trend, setTrend] = useState<PortfolioTrendDetail | null>(null);
   const [history, setHistory] = useState<TrendHistory | null>(null);
@@ -34,7 +34,7 @@ export default function PortfolioTrendPage() {
 
   useEffect(() => {
     Promise.all([
-      fetchPortfolioTrend(params.id),
+      fetchPortfolioTrend(params.id, lang),
       fetchTrendHistory(params.id),
       fetchPestelAnalysis(params.id),
     ])
@@ -44,7 +44,7 @@ export default function PortfolioTrendPage() {
         setPestel(pestelData);
       })
       .catch((e) => setError(String(e)));
-  }, [params.id]);
+  }, [params.id, lang]);
 
   const evidence = useMemo(() => {
     const all = [...(trend?.evidence ?? []), ...(history?.evidence ?? [])];

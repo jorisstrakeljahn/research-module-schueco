@@ -26,6 +26,7 @@ from app.models import (
     TopicTimepoint,
     Trend,
     TrendAssessment,
+    TrendTranslation,
 )
 from app.pipeline.classify import TrendSignal, get_classifier, radar_stage
 from app.pipeline.corpus import materialize_corpus
@@ -47,6 +48,7 @@ from app.pipeline.timeseries import (
     topic_prevalence,
 )
 from app.pipeline.topics import get_topic_modeler
+from app.pipeline.translate import SUPPORTED_LANGUAGES, resolve_translator
 
 logger = logging.getLogger(__name__)
 
@@ -375,6 +377,7 @@ def run_pipeline(
         llm_calls = 0
         retriever = PgVectorRetriever(session, [d.id for d in docs])
         n_topics = 0
+        created_trends: list[tuple[Trend, TrendAssessment]] = []
         for info in result.topics:
             if info.topic_index < 0:  # outliers are not trends
                 continue
@@ -489,21 +492,63 @@ def run_pipeline(
                     language=language or "en",
                 )
             )
+            assessment = TrendAssessment(
+                trend_id=trend.id,
+                pestel=classification.pestel,
+                category=classification.category,
+                impact=classification.impact,
+                urgency=classification.urgency,
+                uncertainty=classification.uncertainty,
+                radar_stage=radar_stage(
+                    classification.impact, classification.urgency
+                ),
+                rationale=classification.rationale,
+            )
+            session.add(assessment)
+            created_trends.append((trend, assessment))
+
+        session.flush()
+
+        # 8. Bilingual persistence (ADR-28): every trend is stored in BOTH
+        # languages. The run's native text stays on the Trend itself; both DE and
+        # EN copies live in trend_translation so any UI language is first-class.
+        run_language = (language or "en").lower()
+        if run_language not in SUPPORTED_LANGUAGES:
+            run_language = "en"
+        other_language = "de" if run_language == "en" else "en"
+        if progress:
+            progress(
+                "translating",
+                86,
+                "Trend texts are being translated (DE/EN)",
+                {"trends": len(created_trends), "target": other_language},
+            )
+        translator = resolve_translator(settings)
+        for trend, assessment in created_trends:
             session.add(
-                TrendAssessment(
+                TrendTranslation(
                     trend_id=trend.id,
-                    pestel=classification.pestel,
-                    category=classification.category,
-                    impact=classification.impact,
-                    urgency=classification.urgency,
-                    uncertainty=classification.uncertainty,
-                    radar_stage=radar_stage(
-                        classification.impact, classification.urgency
-                    ),
-                    rationale=classification.rationale,
+                    language=run_language,
+                    title=trend.title,
+                    summary=trend.summary,
+                    rationale=assessment.rationale,
                 )
             )
-
+            translated = translator.translate(
+                title=trend.title,
+                summary=trend.summary,
+                rationale=assessment.rationale,
+                language=other_language,
+            )
+            session.add(
+                TrendTranslation(
+                    trend_id=trend.id,
+                    language=other_language,
+                    title=translated.title,
+                    summary=translated.summary,
+                    rationale=translated.rationale,
+                )
+            )
         session.flush()
         if progress:
             progress(

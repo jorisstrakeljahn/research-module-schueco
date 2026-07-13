@@ -221,6 +221,9 @@ class PortfolioDecisionIn(BaseModel):
     changes: dict[str, Any] = Field(default_factory=dict)
     target_trend_id: str | int | None = None
     idempotency_key: str = Field(min_length=1)
+    # UI language of manual edits; the other language is kept in sync via the
+    # translator so the bilingual canonical record never drifts apart.
+    language: Literal["en", "de"] = "en"
 
 
 class ReviewDecisionIn(BaseModel):
@@ -231,6 +234,7 @@ class ReviewDecisionIn(BaseModel):
     canonical_trend_id: str | int | None = None
     target_trend_id: str | int | None = None
     idempotency_key: str = Field(min_length=1)
+    language: Literal["en", "de"] = "en"
 
 
 class RunRequest(BaseModel):

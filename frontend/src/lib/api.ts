@@ -242,6 +242,8 @@ export interface PortfolioDecisionInput {
   changes?: Record<string, unknown>;
   target_trend_id?: string | number;
   idempotency_key?: string;
+  /** UI language of manual edits, keeps the bilingual record in sync. */
+  language?: ContentLang;
 }
 
 export interface ReviewDecisionInput {
@@ -252,6 +254,7 @@ export interface ReviewDecisionInput {
   canonical_trend_id?: string | number;
   target_trend_id?: string | number;
   idempotency_key?: string;
+  language?: ContentLang;
 }
 
 async function getJSON<T>(path: string): Promise<T> {
@@ -265,13 +268,23 @@ function listFrom<T>(payload: T[] | { items?: T[]; trends?: T[]; runs?: T[] }): 
   return payload.items ?? payload.trends ?? payload.runs ?? [];
 }
 
-export function fetchTrends(maturity?: string): Promise<Trend[]> {
-  const q = maturity ? `?maturity=${encodeURIComponent(maturity)}` : "";
-  return getJSON<Trend[]>(`/trends${q}`);
+export type ContentLang = "de" | "en";
+
+function query(params: Record<string, string | number | undefined>): string {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== "") search.set(key, String(value));
+  }
+  const s = search.toString();
+  return s ? `?${s}` : "";
 }
 
-export function fetchTrend(id: number): Promise<TrendDetail> {
-  return getJSON<TrendDetail>(`/trends/${id}`);
+export function fetchTrends(maturity?: string, language?: ContentLang): Promise<Trend[]> {
+  return getJSON<Trend[]>(`/trends${query({ maturity, language })}`);
+}
+
+export function fetchTrend(id: number, language?: ContentLang): Promise<TrendDetail> {
+  return getJSON<TrendDetail>(`/trends/${id}${query({ language })}`);
 }
 
 export function fetchRuns(limit = 20): Promise<Run[]> {
@@ -284,15 +297,22 @@ export function fetchSearchCapabilities(): Promise<SearchCapabilities> {
   return getJSON<SearchCapabilities>("/search/capabilities");
 }
 
-export function fetchPortfolioTrends(status = "active"): Promise<PortfolioTrend[]> {
-  const query = status ? `?status=${encodeURIComponent(status)}` : "";
+export function fetchPortfolioTrends(
+  status = "active",
+  language?: ContentLang,
+): Promise<PortfolioTrend[]> {
   return getJSON<
     PortfolioTrend[] | { items?: PortfolioTrend[]; trends?: PortfolioTrend[] }
-  >(`/portfolio/trends${query}`).then(listFrom);
+  >(`/portfolio/trends${query({ status, language })}`).then(listFrom);
 }
 
-export function fetchPortfolioTrend(id: string | number): Promise<PortfolioTrendDetail> {
-  return getJSON<PortfolioTrendDetail>(`/portfolio/trends/${encodeURIComponent(id)}`);
+export function fetchPortfolioTrend(
+  id: string | number,
+  language?: ContentLang,
+): Promise<PortfolioTrendDetail> {
+  return getJSON<PortfolioTrendDetail>(
+    `/portfolio/trends/${encodeURIComponent(id)}${query({ language })}`,
+  );
 }
 
 export function fetchPestelAnalysis(id: string | number): Promise<PestelAnalysis> {
@@ -307,18 +327,20 @@ export function fetchTrendHistory(id: string | number): Promise<TrendHistory> {
   );
 }
 
-export function fetchRunDiff(id: number): Promise<RunDiff> {
-  return getJSON<RunDiff>(`/runs/${id}/diff`);
+export function fetchRunDiff(id: number, language?: ContentLang): Promise<RunDiff> {
+  return getJSON<RunDiff>(`/runs/${id}/diff${query({ language })}`);
 }
 
 export function fetchRunProgress(id: number): Promise<RunProgress> {
   return getJSON<RunProgress>(`/runs/${id}/progress`);
 }
 
-export function fetchReviewQueue(runId?: number): Promise<ReviewQueueItem[]> {
-  const query = runId == null ? "" : `?run_id=${encodeURIComponent(runId)}`;
+export function fetchReviewQueue(
+  runId?: number,
+  language?: ContentLang,
+): Promise<ReviewQueueItem[]> {
   return getJSON<ReviewQueueItem[] | { items?: ReviewQueueItem[] }>(
-    `/review-queue${query}`,
+    `/review-queue${query({ run_id: runId, language })}`,
   ).then(listFrom);
 }
 

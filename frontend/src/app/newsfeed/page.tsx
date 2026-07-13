@@ -18,7 +18,7 @@ import {
 import { useI18n } from "@/lib/i18n";
 
 export default function NewsfeedPage() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const [trends, setTrends] = useState<Trend[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -28,11 +28,11 @@ export default function NewsfeedPage() {
   const [query, setQuery] = useState("");
 
   useEffect(() => {
-    fetchPortfolioTrends("active")
+    fetchPortfolioTrends("active", lang)
       .then(setTrends)
       .catch((e) => setError(String(e)))
       .finally(() => setLoading(false));
-  }, []);
+  }, [lang]);
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase();
@@ -61,6 +61,7 @@ export default function NewsfeedPage() {
         reviewer: "newsfeed-ui",
         reason: `Maturity changed from ${old ?? "unset"} to ${newMaturity} via newsfeed`,
         changes: { maturity: newMaturity },
+        language: lang,
       });
       toast.success(t("newsfeed.toastReclass"), {
         description: t("newsfeed.toastReclassDesc", {

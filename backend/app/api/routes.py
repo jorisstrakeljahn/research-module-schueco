@@ -30,6 +30,7 @@ from app.models import (
 )
 from app.pestel import build_pestel_analysis
 from app.pipeline.matching import sanitize_change
+from app.pipeline.translate import resolve_translator, translations_for_trend
 from app.portfolio import record_decision
 from app.schemas import (
     EvaluationOut,
@@ -187,14 +188,46 @@ def _latest_completed_run_id(session: Session) -> int | None:
     return run.id if run else None
 
 
+def _trend_translations(
+    session: Session, trend_ids: list[int], language: str | None
+) -> dict[int, TrendTranslation]:
+    """Batch-load stored translations for run trends in the requested language."""
+    if not language or not trend_ids:
+        return {}
+    rows = session.exec(
+        select(TrendTranslation).where(
+            TrendTranslation.trend_id.in_(trend_ids),
+            TrendTranslation.language == language,
+        )
+    ).all()
+    return {row.trend_id: row for row in rows}
+
+
+def _canonical_text(
+    canonical: CanonicalTrend, language: str | None
+) -> tuple[str, str, str | None]:
+    """(title, summary, rationale) of a portfolio trend in the requested language."""
+    entry = (canonical.translations or {}).get(language) if language else None
+    if not entry:
+        return canonical.title, canonical.summary, None
+    return (
+        str(entry.get("title") or canonical.title),
+        str(entry.get("summary") or canonical.summary),
+        entry.get("rationale"),
+    )
+
+
 def _to_trend_out(
-    trend: Trend, topic: Topic, assessment: TrendAssessment | None
+    trend: Trend,
+    topic: Topic,
+    assessment: TrendAssessment | None,
+    translation: TrendTranslation | None = None,
 ) -> TrendOut:
     return TrendOut(
         id=trend.id,
         run_id=trend.run_id,
-        title=trend.title,
-        summary=trend.summary,
+        title=translation.title if translation else trend.title,
+        summary=translation.summary if translation else trend.summary,
         maturity=trend.maturity,
         emergence=trend.emergence,
         keywords=topic.keywords or [],
@@ -230,6 +263,61 @@ def _trends_with_relations(
     if region:
         query = query.where(Topic.region == region)
     return session.exec(query).all()
+
+
+def _sync_canonical_translations(
+    session: Session,
+    canonical: CanonicalTrend,
+    *,
+    trend: Trend | None = None,
+    assessment: TrendAssessment | None = None,
+    edits: dict[str, Any] | None = None,
+    edit_language: str = "en",
+) -> None:
+    """Keep the bilingual canonical text in sync after a review decision.
+
+    Base translations come from the accepted run trend (if any); manual title/
+    summary edits overwrite the reviewer's UI language and are re-translated into
+    the other language so DE and EN never drift apart.
+    """
+    from app.config import get_settings
+
+    if trend is not None:
+        translations = translations_for_trend(
+            session,
+            trend.id,
+            fallback_title=trend.title,
+            fallback_summary=trend.summary,
+            fallback_rationale=assessment.rationale if assessment else None,
+        )
+    else:
+        translations = dict(canonical.translations or {})
+    text_edits = {
+        key: value
+        for key, value in (edits or {}).items()
+        if key in ("title", "summary") and value
+    }
+    if text_edits:
+        entry = dict(translations.get(edit_language) or {})
+        entry.update(text_edits)
+        translations[edit_language] = entry
+        other = "de" if edit_language == "en" else "en"
+        translator = resolve_translator(get_settings())
+        translated = translator.translate(
+            title=str(entry.get("title") or canonical.title),
+            summary=str(entry.get("summary") or canonical.summary),
+            rationale=entry.get("rationale"),
+            language=other,
+        )
+        translations[other] = {
+            "title": translated.title,
+            "summary": translated.summary,
+            "rationale": translated.rationale,
+        }
+    if translations:
+        canonical.translations = translations
+        session.add(canonical)
+        session.commit()
 
 
 def _decision_out(decision: TrendDecision) -> TrendDecisionOut:
@@ -319,13 +407,15 @@ def _portfolio_out(
     occurrence: TrendOccurrence,
     snapshot: tuple[Trend, Topic, TrendAssessment | None],
     occurrence_count: int,
+    language: str | None = None,
 ) -> PortfolioTrendOut:
     trend, topic, _ = snapshot
+    title, summary, _ = _canonical_text(canonical, language)
     return PortfolioTrendOut(
         id=canonical.id,
         run_id=occurrence.run_id,
-        title=canonical.title,
-        summary=canonical.summary,
+        title=title,
+        summary=summary,
         maturity=canonical.maturity,
         emergence=trend.emergence,
         keywords=topic.keywords or [],
@@ -564,6 +654,7 @@ def list_trends(
     run_id: int | None = Query(default=None, description="Defaults to latest run"),
     maturity: str | None = Query(default=None),
     region: str | None = Query(default=None, description="Filter by topic region"),
+    language: str | None = Query(default=None, description="Serve trend text in de|en"),
     session: Session = Depends(get_session),
 ) -> list[TrendOut]:
     if run_id is None:
@@ -571,12 +662,18 @@ def list_trends(
     if run_id is None:
         return []
     rows = _trends_with_relations(session, run_id, maturity=maturity, region=region)
-    return [_to_trend_out(trend, topic, assessment) for trend, topic, assessment in rows]
+    translations = _trend_translations(session, [trend.id for trend, _, _ in rows], language)
+    return [
+        _to_trend_out(trend, topic, assessment, translations.get(trend.id))
+        for trend, topic, assessment in rows
+    ]
 
 
 @router.get("/trends/{trend_id}", response_model=TrendDetailOut)
 def get_trend(
-    trend_id: int, session: Session = Depends(get_session)
+    trend_id: int,
+    language: str | None = Query(default=None, description="Serve trend text in de|en"),
+    session: Session = Depends(get_session),
 ) -> TrendDetailOut:
     row = session.exec(
         select(Trend, Topic, TrendAssessment)
@@ -587,16 +684,20 @@ def get_trend(
     if not row:
         raise HTTPException(status_code=404, detail="Trend not found")
     trend, topic, assessment = row
-    base = _to_trend_out(trend, topic, assessment)
+    translation = _trend_translations(session, [trend.id], language).get(trend.id)
+    base = _to_trend_out(trend, topic, assessment, translation)
     timepoints = session.exec(
         select(TopicTimepoint)
         .where(TopicTimepoint.topic_id == trend.topic_id)
         .order_by(TopicTimepoint.period)
     ).all()
     timepoints = timepoints[-24:]
+    rationale = assessment.rationale if assessment else None
+    if translation and translation.rationale:
+        rationale = translation.rationale
     return TrendDetailOut(
         **base.model_dump(),
-        rationale=assessment.rationale if assessment else None,
+        rationale=rationale,
         evidence=trend.evidence or [],
         timeseries=[TimepointOut(period=t.period, doc_count=t.doc_count) for t in timepoints],
     )
@@ -605,6 +706,7 @@ def get_trend(
 @router.get("/portfolio/trends", response_model=list[PortfolioTrendOut])
 def list_portfolio_trends(
     status: str | None = Query(default="active"),
+    language: str | None = Query(default=None, description="Serve trend text in de|en"),
     session: Session = Depends(get_session),
 ) -> list[PortfolioTrendOut]:
     query = select(CanonicalTrend).order_by(CanonicalTrend.updated_at.desc())
@@ -617,7 +719,11 @@ def list_portfolio_trends(
         occurrence = latest.get(canonical.id)
         snapshot = _occurrence_snapshot(session, occurrence) if occurrence else None
         if occurrence and snapshot:
-            result.append(_portfolio_out(canonical, occurrence, snapshot, counts[canonical.id]))
+            result.append(
+                _portfolio_out(
+                    canonical, occurrence, snapshot, counts[canonical.id], language
+                )
+            )
     return result
 
 
@@ -625,7 +731,9 @@ def list_portfolio_trends(
     "/portfolio/trends/{canonical_id}", response_model=PortfolioTrendDetailOut
 )
 def get_portfolio_trend(
-    canonical_id: str, session: Session = Depends(get_session)
+    canonical_id: str,
+    language: str | None = Query(default=None, description="Serve trend text in de|en"),
+    session: Session = Depends(get_session),
 ) -> PortfolioTrendDetailOut:
     canonical = session.get(CanonicalTrend, canonical_id)
     if canonical is None:
@@ -636,16 +744,22 @@ def get_portfolio_trend(
     if occurrence is None or snapshot is None:
         raise HTTPException(status_code=404, detail="Portfolio trend has no snapshot")
     trend, topic, assessment = snapshot
-    base = _portfolio_out(canonical, occurrence, snapshot, counts[canonical.id])
+    base = _portfolio_out(
+        canonical, occurrence, snapshot, counts[canonical.id], language
+    )
     timepoints = session.exec(
         select(TopicTimepoint)
         .where(TopicTimepoint.topic_id == topic.id)
         .order_by(TopicTimepoint.period)
     ).all()
     timepoints = timepoints[-24:]
+    rationale = assessment.rationale if assessment else None
+    translated_rationale = _canonical_text(canonical, language)[2]
+    if translated_rationale:
+        rationale = translated_rationale
     return PortfolioTrendDetailOut(
         **base.model_dump(),
-        rationale=assessment.rationale if assessment else None,
+        rationale=rationale,
         evidence=_evidence_out(trend.evidence, occurrence.run_id),
         timeseries=[
             TimepointOut(period=point.period, doc_count=point.doc_count)
@@ -729,7 +843,11 @@ def get_portfolio_trend_history(
 
 
 @router.get("/runs/{run_id}/diff", response_model=RunDiffOut)
-def get_run_diff(run_id: int, session: Session = Depends(get_session)) -> RunDiffOut:
+def get_run_diff(
+    run_id: int,
+    language: str | None = Query(default=None, description="Serve trend text in de|en"),
+    session: Session = Depends(get_session),
+) -> RunDiffOut:
     run = session.get(Run, run_id)
     if run is None:
         raise HTTPException(status_code=404, detail="Run not found")
@@ -738,6 +856,9 @@ def get_run_diff(run_id: int, session: Session = Depends(get_session)) -> RunDif
         .where(TrendOccurrence.run_id == run_id)
         .order_by(TrendOccurrence.id)
     ).all()
+    translations = _trend_translations(
+        session, [occurrence.trend_id for occurrence in occurrences], language
+    )
     entries: list[RunDiffEntryOut] = []
     for occurrence in occurrences:
         snapshot = _occurrence_snapshot(session, occurrence)
@@ -766,12 +887,13 @@ def get_run_diff(run_id: int, session: Session = Depends(get_session)) -> RunDif
                 occurrence.evidence_added_count or occurrence.evidence_removed_count
             ),
         )
+        translation = translations.get(occurrence.trend_id)
         entries.append(
             RunDiffEntryOut(
                 occurrence_id=occurrence.id,
                 canonical_trend_id=occurrence.canonical_trend_id,
                 trend_id=occurrence.trend_id,
-                title=trend.title,
+                title=translation.title if translation else trend.title,
                 change_type=change_type,
                 match_score=occurrence.match_score,
                 margin=occurrence.match_margin,
@@ -804,6 +926,7 @@ def get_run_diff(run_id: int, session: Session = Depends(get_session)) -> RunDif
 @router.get("/review-queue", response_model=list[ReviewQueueItemOut])
 def list_review_queue(
     run_id: int | None = Query(default=None),
+    language: str | None = Query(default=None, description="Serve trend text in de|en"),
     session: Session = Depends(get_session),
 ) -> list[ReviewQueueItemOut]:
     query = (
@@ -818,13 +941,24 @@ def list_review_queue(
     if run_id is not None:
         query = query.where(TrendOccurrence.run_id == run_id)
     rows = session.exec(query).all()
+    translations = _trend_translations(
+        session, [trend.id for _, trend, _ in rows], language
+    )
     return [
         ReviewQueueItemOut(
             occurrence_id=occurrence.id,
             run_id=occurrence.run_id,
             canonical_trend_id=canonical.id if canonical else None,
-            title=trend.title,
-            summary=trend.summary,
+            title=(
+                translations[trend.id].title
+                if trend.id in translations
+                else trend.title
+            ),
+            summary=(
+                translations[trend.id].summary
+                if trend.id in translations
+                else trend.summary
+            ),
             maturity=trend.maturity,
             match_score=occurrence.match_score,
             margin=occurrence.match_margin,
@@ -838,7 +972,9 @@ def list_review_queue(
             reason=occurrence.review_reason,
             suggested_trend=(
                 SuggestedTrendOut(
-                    id=canonical.id, title=canonical.title, status=canonical.status
+                    id=canonical.id,
+                    title=_canonical_text(canonical, language)[0],
+                    status=canonical.status,
                 )
                 if canonical
                 else None
@@ -876,6 +1012,15 @@ def decide_portfolio_trend(
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if body.action in {"confirm", "correct"} and body.changes:
+        canonical = session.get(CanonicalTrend, canonical_id)
+        if canonical is not None:
+            _sync_canonical_translations(
+                session,
+                canonical,
+                edits=body.changes,
+                edit_language=body.language,
+            )
     return _decision_out(decision)
 
 
@@ -1035,6 +1180,18 @@ def decide_review_item(
         occurrence.canonical_trend_id = str(values["merged_into_id"])
         session.add(occurrence)
         session.commit()
+    if body.action in {"confirm", "correct", "create"}:
+        # "link" intentionally keeps the curated bilingual text of the target.
+        canonical = session.get(CanonicalTrend, canonical_id)
+        if canonical is not None:
+            _sync_canonical_translations(
+                session,
+                canonical,
+                trend=trend,
+                assessment=assessment,
+                edits=body.changes if body.action == "correct" else None,
+                edit_language=body.language,
+            )
     return _decision_out(decision)
 
 
@@ -1080,7 +1237,6 @@ def translate_trend(
 ) -> TranslateOut:
     """Translate a trend's title/summary/rationale into ``language`` on demand (ADR-28)."""
     from app.config import get_settings
-    from app.pipeline.translate import resolve_translator
 
     trend = session.get(Trend, trend_id)
     if not trend:
