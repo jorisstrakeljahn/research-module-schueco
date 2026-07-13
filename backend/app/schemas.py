@@ -97,6 +97,14 @@ class PortfolioTrendOut(TrendOut):
     updated_at: datetime | None = None
     # Manual drag & drop sort position within the newsfeed maturity column.
     position: float | None = None
+    # Unreviewed run results surfaced alongside the curated portfolio
+    # (``include_pending=true``): either a brand-new trend awaiting review
+    # (synthetic ``pending-<occurrence_id>`` id) or a pending change to an
+    # existing portfolio trend.
+    pending_review: bool = False
+    pending_change_type: RunDiffKind | None = None
+    pending_occurrence_id: int | None = None
+    pending_run_id: int | None = None
 
 
 class PortfolioOrderItemIn(BaseModel):

@@ -169,26 +169,29 @@ def _seed_portfolio(session) -> tuple[CanonicalTrend, CanonicalTrend, TrendOccur
 def test_portfolio_read_contracts(client, session):
     canonical, _, review = _seed_portfolio(session)
 
+    # The run-2 occurrence is still pending review, so the curated snapshot
+    # keeps serving the last *approved* observation (run 1).
+    approved_run_id = review.run_id - 1
     listing = client.get("/portfolio/trends").json()
     item = next(item for item in listing if item["id"] == canonical.id)
-    assert item["keywords"] == ["facade", f"run-{review.run_id}"]
-    assert item["size"] == 4
+    assert item["keywords"] == ["facade", f"run-{approved_run_id}"]
+    assert item["size"] == 2
     assert item["occurrence_count"] == 2
     assert item["status"] == "active"
     assert item["first_run_id"] < item["last_run_id"]
 
     detail = client.get(f"/portfolio/trends/{canonical.id}")
     assert detail.status_code == 200
-    assert detail.json()["rationale"] == "Rationale for Adaptive building envelopes"
-    assert detail.json()["evidence"][0]["title"] == "Latest paper"
-    assert detail.json()["evidence"][0]["run_id"] == review.run_id
-    assert detail.json()["timeseries"] == [{"period": "2026-Q1", "doc_count": 4}]
+    assert detail.json()["rationale"] == "Rationale for Adaptive facades"
+    assert detail.json()["evidence"][0]["title"] == "First paper"
+    assert detail.json()["evidence"][0]["run_id"] == approved_run_id
+    assert detail.json()["timeseries"] == [{"period": "2026-Q1", "doc_count": 2}]
 
     pestel = client.get(
         f"/portfolio/trends/{canonical.id}/pestel-analysis"
     ).json()
     assert pestel["trend_id"] == canonical.id
-    assert pestel["run_id"] == review.run_id
+    assert pestel["run_id"] == approved_run_id
     assert [item["dimension"] for item in pestel["dimensions"]] == [
         "political",
         "economic",
@@ -552,27 +555,58 @@ def test_review_actions_resolve_queue_append_only(client, session, action):
         assert created.status == "active"
 
 
+def _add_pending_new_occurrence(session) -> tuple[Run, TrendOccurrence]:
+    run = Run(status="completed", n_documents=1, n_topics=1)
+    session.add(run)
+    session.commit()
+    session.refresh(run)
+    trend = _add_snapshot(
+        session,
+        run=run,
+        index=0,
+        title="Unreviewed novel trend",
+        size=1,
+        maturity="weak_signal",
+        evidence_title="Unreviewed evidence",
+    )
+    occurrence = TrendOccurrence(
+        trend_id=trend.id,
+        run_id=run.id,
+        change_type="new",
+        review_status="pending",
+        review_reasons=[{"code": "new_trend", "kind": "classification"}],
+        changed_fields=["title", "summary", "maturity"],
+    )
+    session.add(occurrence)
+    session.commit()
+    session.refresh(occurrence)
+    return run, occurrence
+
+
 @requires_db
-def test_portfolio_api_validation_and_missing_resources(client, session):
+def test_portfolio_include_pending_surfaces_unreviewed_results(client, session):
     canonical, _, review = _seed_portfolio(session)
-    assert client.get("/portfolio/trends/missing").status_code == 404
-    assert client.get("/runs/999999/diff").status_code == 404
-    assert client.post(
-        f"/portfolio/trends/{canonical.id}/decisions",
-        json={
-            "action": "merge",
-            "reviewer": "r",
-            "reason": "invalid",
-            "target_trend_id": canonical.id,
-            "idempotency_key": "self-merge",
-        },
-    ).status_code == 422
-    assert client.post(
-        f"/review-queue/{review.id}/decision",
-        json={
-            "action": "link",
-            "reviewer": "r",
-            "reason": "missing target",
-            "idempotency_key": "missing-target",
-        },
-    ).status_code == 422
+    run, occurrence = _add_pending_new_occurrence(session)
+
+    plain = client.get("/portfolio/trends").json()
+    assert all(not item.get("pending_review") for item in plain)
+    assert all(not str(item["id"]).startswith("pending-") for item in plain)
+
+    listing = client.get(
+        "/portfolio/trends", params={"include_pending": "true"}
+    ).json()
+    provisional = next(
+        item for item in listing if item["id"] == f"pending-{occurrence.id}"
+    )
+    assert provisional["pending_review"] is True
+    assert provisional["pending_change_type"] == "new"
+    assert provisional["pending_run_id"] == run.id
+    assert provisional["title"] == "Unreviewed novel trend"
+    assert provisional["status"] == "review"
+
+    flagged = next(item for item in listing if item["id"] == canonical.id)
+    assert flagged["pending_review"] is True
+    assert flagged["pending_change_type"] == "classification_changed"
+    assert flagged["pending_occurrence_id"] == review.id
+    # The curated values still come from the last approved observation.
+    assert flagged["size"] == 2

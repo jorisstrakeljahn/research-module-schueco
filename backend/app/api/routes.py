@@ -423,11 +423,20 @@ def _latest_occurrences(
         .where(TrendOccurrence.canonical_trend_id.in_(ids))
         .order_by(TrendOccurrence.run_id.desc(), TrendOccurrence.id.desc())
     ).all()
+    # The portfolio snapshot must come from a *reviewed* observation; unreviewed
+    # (pending) or rejected occurrences would leak unconfirmed run data into the
+    # curated portfolio. Fall back to the newest occurrence of any status only
+    # when no reviewed one exists (e.g. freshly seeded data).
     latest: dict[str, TrendOccurrence] = {}
+    fallback: dict[str, TrendOccurrence] = {}
     counts: Counter[str] = Counter()
     for occurrence in occurrences:
         counts[occurrence.canonical_trend_id] += 1
-        latest.setdefault(occurrence.canonical_trend_id, occurrence)
+        fallback.setdefault(occurrence.canonical_trend_id, occurrence)
+        if occurrence.review_status in ("approved", "not_required"):
+            latest.setdefault(occurrence.canonical_trend_id, occurrence)
+    for canonical_id, occurrence in fallback.items():
+        latest.setdefault(canonical_id, occurrence)
     return latest, dict(counts)
 
 
@@ -723,10 +732,58 @@ def get_trend(
     )
 
 
+def _pending_portfolio_entries(
+    session: Session, language: str | None
+) -> tuple[list[PortfolioTrendOut], dict[str, TrendOccurrence]]:
+    """Unreviewed run output for ``include_pending``: brand-new trends become
+    provisional entries; pending changes to known trends are returned as a map
+    canonical_id -> occurrence so the curated entry can be flagged."""
+    pending = session.exec(
+        select(TrendOccurrence)
+        .where(TrendOccurrence.review_status == "pending")
+        .order_by(TrendOccurrence.run_id.desc(), TrendOccurrence.id.desc())
+    ).all()
+    new_entries: list[PortfolioTrendOut] = []
+    changed: dict[str, TrendOccurrence] = {}
+    translations = _trend_translations(
+        session,
+        [item.trend_id for item in pending if item.canonical_trend_id is None],
+        language,
+    )
+    for occurrence in pending:
+        if occurrence.canonical_trend_id is not None:
+            changed.setdefault(occurrence.canonical_trend_id, occurrence)
+            continue
+        snapshot = _occurrence_snapshot(session, occurrence)
+        if snapshot is None:
+            continue
+        trend, topic, assessment = snapshot
+        base = _to_trend_out(
+            trend, topic, assessment, translations.get(trend.id)
+        )
+        new_entries.append(
+            PortfolioTrendOut(
+                **{**base.model_dump(), "id": f"pending-{occurrence.id}"},
+                status="review",
+                first_run_id=occurrence.run_id,
+                last_run_id=occurrence.run_id,
+                pending_review=True,
+                pending_change_type=occurrence.change_type,
+                pending_occurrence_id=occurrence.id,
+                pending_run_id=occurrence.run_id,
+            )
+        )
+    return new_entries, changed
+
+
 @router.get("/portfolio/trends", response_model=list[PortfolioTrendOut])
 def list_portfolio_trends(
     status: str | None = Query(default="active"),
     language: str | None = Query(default=None, description="Serve trend text in de|en"),
+    include_pending: bool = Query(
+        default=False,
+        description="Also surface unreviewed run results as provisional entries",
+    ),
     session: Session = Depends(get_session),
 ) -> list[PortfolioTrendOut]:
     # Manually sorted trends first (drag & drop order), the rest by recency.
@@ -738,17 +795,26 @@ def list_portfolio_trends(
         query = query.where(CanonicalTrend.status == status)
     canonicals = list(session.exec(query).all())
     latest, counts = _latest_occurrences(session, canonicals)
+    pending_new: list[PortfolioTrendOut] = []
+    pending_changed: dict[str, TrendOccurrence] = {}
+    if include_pending:
+        pending_new, pending_changed = _pending_portfolio_entries(session, language)
     result: list[PortfolioTrendOut] = []
     for canonical in canonicals:
         occurrence = latest.get(canonical.id)
         snapshot = _occurrence_snapshot(session, occurrence) if occurrence else None
         if occurrence and snapshot:
-            result.append(
-                _portfolio_out(
-                    canonical, occurrence, snapshot, counts[canonical.id], language
-                )
+            entry = _portfolio_out(
+                canonical, occurrence, snapshot, counts[canonical.id], language
             )
-    return result
+            pending_occurrence = pending_changed.get(canonical.id)
+            if pending_occurrence is not None:
+                entry.pending_review = True
+                entry.pending_change_type = pending_occurrence.change_type
+                entry.pending_occurrence_id = pending_occurrence.id
+                entry.pending_run_id = pending_occurrence.run_id
+            result.append(entry)
+    return pending_new + result
 
 
 @router.post("/portfolio/order", dependencies=[Depends(require_token)])
@@ -828,11 +894,10 @@ def get_portfolio_trend_pestel_analysis(
     canonical = session.get(CanonicalTrend, canonical_id)
     if canonical is None:
         raise HTTPException(status_code=404, detail="Portfolio trend not found")
-    occurrence = session.exec(
-        select(TrendOccurrence)
-        .where(TrendOccurrence.canonical_trend_id == canonical_id)
-        .order_by(TrendOccurrence.run_id.desc(), TrendOccurrence.id.desc())
-    ).first()
+    # Same reviewed-first rule as the portfolio listing: unreviewed run data
+    # must not silently drive the curated analysis.
+    occurrence, _ = _latest_occurrences(session, [canonical])
+    occurrence = occurrence.get(canonical.id)
     if occurrence is None:
         raise HTTPException(status_code=404, detail="Portfolio trend has no snapshot")
     try:
@@ -1032,6 +1097,7 @@ def list_review_queue(
                         zip(
                             ("title", "summary"),
                             _canonical_text(canonical, language)[:2],
+                            strict=True,
                         )
                     )
                     if canonical
