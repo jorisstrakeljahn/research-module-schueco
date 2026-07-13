@@ -33,12 +33,19 @@ tests/                 # pytest (DB-backed tests skip if Postgres is unreachable
 | Embedder | `hashing` | `sentence_transformers` (ml), `openai` (llm) |
 | Topic model | `simple` (KMeans + c-TF-IDF) | `bertopic` (ml) |
 | Describer | `template` | `openai` (llm) |
+| Classifier | `heuristic` | `openai` (llm) |
+| Translator | `none` (identity) | `openai` (llm) |
 
-Select via `.env` (`EMBEDDER`, `TOPIC_MODEL`, `DESCRIBER`, `EMBEDDING_DIM`).
+Select via `.env` (`EMBEDDER`, `TOPIC_MODEL`, `DESCRIBER`, `CLASSIFIER`, `TRANSLATOR`,
+`EMBEDDING_DIM`). Every stage degrades to its offline fallback at runtime when the
+extra is not installed, the API key is missing or the provider call fails — a run
+never aborts because of an unavailable component. `TOPIC_MAX` (default 8) is a hard
+cap on the number of clusters BERTopic may produce per run.
 
 ## Commands
 
 ```bash
+uv sync --extra ml --extra llm           # install incl. Sentence-BERT/BERTopic/OpenAI
 uv run trendscout init-db
 uv run trendscout seed-demo              # load data/demo.sql into local Postgres
 uv run trendscout run "circular construction facade" --limit 40

@@ -9,7 +9,9 @@ assesses it (PESTEL · category · impact/urgency → Act/Prepare/Watch) and let
 review the result. The frontend renders a Schüco-style **Trendradar**.
 
 Every pipeline stage has an **offline fallback** (runs with no API key) and a
-**scientific** implementation (Sentence-BERT, BERTopic, LLM).
+**scientific** implementation (Sentence-BERT, BERTopic, LLM). Missing extras, missing
+API keys or failing sources degrade gracefully at runtime — a search run never aborts
+because one component is unavailable.
 
 ```
 sources ─▶ ingest ─▶ embed ─▶ topics ─▶ time series ─▶ describe ─▶ classify (PESTEL/impact)
@@ -69,7 +71,7 @@ docker compose up -d db
 
 # 2. Backend
 cd backend
-uv sync
+uv sync --extra ml --extra llm   # extras match the .env defaults (Sentence-BERT + BERTopic)
 cp .env.example .env
 uv run alembic upgrade head
 uv run trendscout seed-demo   # loads data/demo.sql (~50 trends)
@@ -138,7 +140,9 @@ uv run ruff check .
 
 Copy `backend/.env.example` to `backend/.env`; secrets (LLM / Firecrawl keys) live in
 `.env` only. Sentence-Transformer embeddings and BERTopic are the application defaults;
-tests explicitly select the deterministic offline fallbacks. Optional services are enabled
+tests explicitly select the deterministic offline fallbacks. `TOPIC_MAX` (default 8) is
+a hard cap on clusters per run, and `MAX_NEW_TRENDS_PER_RUN` (default 5) limits how many
+brand-new trends a run may add to the review queue. Optional services are enabled
 by adding their server-side credentials:
 
 ```bash
