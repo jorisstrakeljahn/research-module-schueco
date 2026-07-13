@@ -8,8 +8,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import PageHeader from "@/components/PageHeader";
 import ReviewCard from "@/components/ReviewCard";
 import {
+  CATEGORY_META,
   fetchReviewQueue,
   fetchRunDiff,
+  RADAR_STAGE_META,
   type ReviewQueueItem,
   type RunDiff,
   type RunDiffEntry,
@@ -139,7 +141,7 @@ export default function RunDetailPage() {
     );
     const body = (
       <>
-        <h3 className="font-semibold leading-snug text-fg group-hover:text-primary">
+        <h3 className="hyphens-auto font-semibold leading-snug wrap-break-word text-fg group-hover:text-primary">
           {entry.title}
         </h3>
         {summary && (
@@ -154,9 +156,9 @@ export default function RunDetailPage() {
                 key={field}
                 className="rounded-full bg-surface-2 px-2.5 py-1 text-xs text-muted"
               >
-                {t(`field.${field}`)}: {displayValue(entry.before?.[field])}
+                {t(`field.${field}`)}: {displayValue(entry.before?.[field], field, t)}
                 {" → "}
-                {displayValue(entry.after?.[field])}
+                {displayValue(entry.after?.[field], field, t)}
               </span>
             ))}
           </div>
@@ -186,9 +188,20 @@ export default function RunDetailPage() {
   }
 }
 
-function displayValue(value: unknown): string {
+function displayValue(
+  value: unknown,
+  field: string,
+  t: (key: string) => string,
+): string {
   if (value == null) return "–";
-  if (Array.isArray(value)) return value.join(", ");
+  const localizeOne = (raw: string): string => {
+    if (field === "maturity") return t(`maturity.${raw}`);
+    if (field === "pestel") return t(`pestel.${raw}`);
+    if (field === "category") return CATEGORY_META[raw]?.label ?? raw;
+    if (field === "radar_stage") return RADAR_STAGE_META[raw]?.label ?? raw;
+    return raw;
+  };
+  if (Array.isArray(value)) return value.map((v) => localizeOne(String(v))).join(", ");
   if (typeof value === "number") return String(Math.round(value * 10) / 10);
-  return String(value);
+  return localizeOne(String(value));
 }

@@ -199,6 +199,23 @@ def test_portfolio_read_contracts(client, session):
     ]
     assert all(item["total_documents"] == 1 for item in pestel["dimensions"])
 
+    # German UI: lexicon signal terms are served with German display labels
+    # (variants like material/materials collapse onto one label).
+    from app.pestel import _localize_terms
+
+    assert _localize_terms(["policy", "material", "materials"], "de") == [
+        "Politik",
+        "Materialien",
+    ]
+    assert _localize_terms(["policy"], None) == ["policy"]
+    assert (
+        client.get(
+            f"/portfolio/trends/{canonical.id}/pestel-analysis",
+            params={"language": "de"},
+        ).status_code
+        == 200
+    )
+
     history = client.get(f"/portfolio/trends/{canonical.id}/history").json()
     assert history["trend_id"] == canonical.id
     assert [point["change_type"] for point in history["points"]] == [

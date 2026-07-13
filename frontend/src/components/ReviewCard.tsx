@@ -4,8 +4,10 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import {
+  CATEGORY_META,
   decideReviewItem,
   fetchPortfolioTrends,
+  RADAR_STAGE_META,
   type PortfolioTrend,
   type ReviewDecisionInput,
   type ReviewQueueItem,
@@ -16,14 +18,17 @@ type Action = ReviewDecisionInput["action"];
 
 const DEFAULT_EDITABLE_FIELDS = ["title", "summary"] as const;
 
-let portfolioCache: Promise<PortfolioTrend[]> | null = null;
+const portfolioCache = new Map<string, Promise<PortfolioTrend[]>>();
 
-function loadPortfolio(): Promise<PortfolioTrend[]> {
-  portfolioCache ??= fetchPortfolioTrends("active").catch(() => {
-    portfolioCache = null;
+function loadPortfolio(lang: "de" | "en"): Promise<PortfolioTrend[]> {
+  const cached = portfolioCache.get(lang);
+  if (cached) return cached;
+  const promise = fetchPortfolioTrends("active", lang).catch(() => {
+    portfolioCache.delete(lang);
     return [];
   });
-  return portfolioCache;
+  portfolioCache.set(lang, promise);
+  return promise;
 }
 
 export default function ReviewCard({
@@ -67,13 +72,13 @@ export default function ReviewCard({
   useEffect(() => {
     if (!needsTarget) return;
     let active = true;
-    void loadPortfolio().then((trends) => {
+    void loadPortfolio(lang).then((trends) => {
       if (active) setPortfolio(trends);
     });
     return () => {
       active = false;
     };
-  }, [needsTarget]);
+  }, [needsTarget, lang]);
 
   const targetOptions = useMemo(
     () =>
@@ -131,7 +136,9 @@ export default function ReviewCard({
               <span>{t("review.score", { n: (item.match_score * 100).toFixed(0) })}</span>
             )}
           </div>
-          <h3 className="mt-1.5 text-base font-semibold text-fg">{item.title}</h3>
+          <h3 className="mt-1.5 hyphens-auto text-base font-semibold wrap-break-word text-fg">
+            {item.title}
+          </h3>
           <p className="mt-1.5 text-sm leading-relaxed text-muted">{item.summary}</p>
           {item.suggested_trend && (
             <p className="mt-2 text-xs text-muted">
@@ -153,7 +160,8 @@ export default function ReviewCard({
             </p>
             {entry.field && (
               <p className="mt-1 text-xs text-muted">
-                {formatValue(entry.before)} → {formatValue(entry.after)}
+                {formatFieldValue(entry.field, entry.before, t)} →{" "}
+                {formatFieldValue(entry.field, entry.after, t)}
               </p>
             )}
           </div>
@@ -246,6 +254,25 @@ function formatValue(value: unknown): string {
   if (Array.isArray(value)) return value.join(", ");
   if (typeof value === "number") return String(Math.round(value * 10) / 10);
   return String(value);
+}
+
+/** Enum-like fields get their display label instead of the raw backend value. */
+function formatFieldValue(
+  field: string,
+  value: unknown,
+  t: (key: string) => string,
+): string {
+  if (value == null) return "–";
+  const localizeOne = (raw: string): string => {
+    if (field === "maturity") return t(`maturity.${raw}`);
+    if (field === "pestel") return t(`pestel.${raw}`);
+    if (field === "category") return CATEGORY_META[raw]?.label ?? raw;
+    if (field === "radar_stage") return RADAR_STAGE_META[raw]?.label ?? raw;
+    return raw;
+  };
+  if (Array.isArray(value)) return value.map((v) => localizeOne(String(v))).join(", ");
+  if (typeof value === "string") return localizeOne(value);
+  return formatValue(value);
 }
 
 function parseValue(value: string, exemplar: unknown): unknown {

@@ -247,9 +247,9 @@ export default function TrendRadar({
                 {"  "}
                 {CATEGORY_META[p.trend.category ?? "technology"]?.label}
                 {"\n"}
-                impact {p.trend.impact?.toFixed(1) ?? "n/a"}
+                {t("field.impact")} {p.trend.impact?.toFixed(1) ?? "–"}
                 {"   "}
-                urgency {p.trend.urgency?.toFixed(1) ?? "n/a"}
+                {t("field.urgency")} {p.trend.urgency?.toFixed(1) ?? "–"}
               </title>
             </circle>
           );

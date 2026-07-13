@@ -316,9 +316,12 @@ export function fetchPortfolioTrend(
   );
 }
 
-export function fetchPestelAnalysis(id: string | number): Promise<PestelAnalysis> {
+export function fetchPestelAnalysis(
+  id: string | number,
+  language?: ContentLang,
+): Promise<PestelAnalysis> {
   return getJSON<PestelAnalysis>(
-    `/portfolio/trends/${encodeURIComponent(id)}/pestel-analysis`,
+    `/portfolio/trends/${encodeURIComponent(id)}/pestel-analysis${query({ language })}`,
   );
 }
 

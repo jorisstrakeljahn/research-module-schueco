@@ -187,7 +187,7 @@ export default function NewsfeedPage() {
                 {t("newsfeed.empty")}
               </p>
             ) : (
-              <div className="grid grid-cols-1 gap-6 @lg:grid-cols-2 @3xl:grid-cols-4">
+              <div className="grid grid-cols-1 gap-5 @lg:grid-cols-2 @4xl:grid-cols-4">
                 {MATURITY_ORDER.filter((m) => maturities.includes(m)).map((m) => {
                   const items = filtered.filter((trend) => trend.maturity === m);
                   const isTargetColumn = dropTarget?.maturity === m && dragId != null;

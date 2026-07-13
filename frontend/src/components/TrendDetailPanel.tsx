@@ -28,7 +28,7 @@ export default function TrendDetailPanel({
         </h3>
         <button
           onClick={onClose}
-          aria-label="close"
+          aria-label={t("common.close")}
           className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-faint transition-colors hover:bg-hover hover:text-fg"
         >
           <X className="h-4 w-4" />
@@ -38,7 +38,7 @@ export default function TrendDetailPanel({
       <div className="flex-1 overflow-auto">
         <div className="space-y-6 px-6 py-6">
           <TrendBadges trend={trend} />
-          <h2 className="text-xl text-fg">{trend.title}</h2>
+          <h2 className="hyphens-auto text-xl wrap-break-word text-fg">{trend.title}</h2>
           <p className="text-sm text-muted">{trend.summary}</p>
 
           <div className="space-y-4 border-t border-border pt-6">
@@ -54,15 +54,15 @@ export default function TrendDetailPanel({
                   </span>
                 ))
               ) : (
-                <span className="text-sm text-faint">n/a</span>
+                <span className="text-sm text-faint">–</span>
               )}
             </div>
           </Field>
 
           <div className="grid grid-cols-3 gap-3">
-            <Score label="Impact" value={trend.impact} />
-            <Score label="Urgency" value={trend.urgency} />
-            <Score label="Uncertainty" value={trend.uncertainty} />
+            <Score field="impact" value={trend.impact} />
+            <Score field="urgency" value={trend.urgency} />
+            <Score field="uncertainty" value={trend.uncertainty} />
           </div>
 
           {trend.emergence != null && (

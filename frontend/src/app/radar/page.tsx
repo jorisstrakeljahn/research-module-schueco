@@ -91,7 +91,7 @@ export default function RadarPage() {
         <>
           <button
             type="button"
-            aria-label="close"
+            aria-label={t("common.close")}
             className="fixed inset-0 z-10 bg-fg/20 lg:hidden"
             onClick={() => setSelected(null)}
           />

@@ -96,11 +96,11 @@ export default function SearchProgressModal({
               const pending = isLast && running;
               return (
                 <li key={line.key} className="flex gap-3 py-1.5">
-                  <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center">
+                  <span className="mt-1 flex h-3.5 w-3.5 shrink-0 items-center justify-center">
                     {pending ? (
                       <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
                     ) : (
-                      <Check className="h-3.5 w-3.5 text-primary/70" />
+                      <span className="h-1.5 w-1.5 rounded-full bg-primary/50" />
                     )}
                   </span>
                   <div className="min-w-0 flex-1">

@@ -294,7 +294,7 @@ export default function TrendSearch({
               <button
                 onClick={() => setKeywords(keywords.filter((x) => x !== k))}
                 disabled={busy}
-                aria-label="remove"
+                aria-label={t("common.remove")}
                 className="transition-colors hover:text-primary-bright"
               >
                 <X className="h-3 w-3" />

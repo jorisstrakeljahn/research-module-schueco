@@ -1,13 +1,6 @@
 "use client";
 
-import {
-  ArrowLeft,
-  ChevronDown,
-  ChevronUp,
-  ExternalLink,
-  GitCommitHorizontal,
-  UserRound,
-} from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -44,7 +37,7 @@ export default function PortfolioTrendPage() {
     Promise.all([
       fetchPortfolioTrend(params.id, lang),
       fetchTrendHistory(params.id),
-      fetchPestelAnalysis(params.id),
+      fetchPestelAnalysis(params.id, lang),
     ])
       .then(([trendData, historyData, pestelData]) => {
         setTrend(trendData);
@@ -76,19 +69,21 @@ export default function PortfolioTrendPage() {
 
         <header className="mt-6 rounded-xl border border-border bg-surface p-6 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="max-w-3xl">
+            <div className="min-w-0 max-w-3xl">
               <TrendBadges trend={trend} />
-              <h1 className="mt-4 text-3xl font-semibold tracking-tight text-fg">{trend.title}</h1>
+              <h1 className="mt-4 hyphens-auto text-3xl font-semibold tracking-tight wrap-break-word text-fg">
+                {trend.title}
+              </h1>
               <p className="mt-3 text-[15px] leading-relaxed text-muted">{trend.summary}</p>
             </div>
             <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-primary">
-              {trend.status}
+              {t(`portfolio.status.${trend.status}`)}
             </span>
           </div>
           <div className="mt-6 grid max-w-xl grid-cols-3 gap-3">
-            <Score label="Impact" value={trend.impact} />
-            <Score label="Urgency" value={trend.urgency} />
-            <Score label="Uncertainty" value={trend.uncertainty} />
+            <Score field="impact" value={trend.impact} />
+            <Score field="urgency" value={trend.urgency} />
+            <Score field="uncertainty" value={trend.uncertainty} />
           </div>
           {trend.rationale && (
             <p className="mt-5 border-l-2 border-primary/40 pl-4 text-sm italic leading-relaxed text-muted">
@@ -308,9 +303,9 @@ function HistoryChart({ points }: { points: TrendHistoryPoint[] }) {
   const { t } = useI18n();
   if (points.length === 0) return <p className="text-sm text-muted">{t("portfolioDetail.noHistory")}</p>;
   const metrics = [
-    { key: "impact" as const, color: "#00a651", label: "Impact" },
-    { key: "urgency" as const, color: "#2ba8e0", label: "Urgency" },
-    { key: "uncertainty" as const, color: "#f5a623", label: "Uncertainty" },
+    { key: "impact" as const, color: "#00a651", label: t("field.impact") },
+    { key: "urgency" as const, color: "#2ba8e0", label: t("field.urgency") },
+    { key: "uncertainty" as const, color: "#f5a623", label: t("field.uncertainty") },
   ];
   const width = 640;
   const height = 150;
@@ -369,15 +364,15 @@ function HistoryChart({ points }: { points: TrendHistoryPoint[] }) {
 }
 
 function HistoryRow({ point }: { point: TrendHistoryPoint }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   return (
     <div className="relative flex gap-3 border-l border-border pb-5 pl-5 last:pb-0">
-      <GitCommitHorizontal className="absolute -left-2 top-0 h-4 w-4 bg-surface text-primary" />
+      <span className="absolute left-[-4.5px] top-1 h-2 w-2 rounded-full bg-primary" />
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <span className="text-sm font-medium text-fg">
             {t("portfolioDetail.run", {
-              date: point.occurred_at ? formatDate(point.occurred_at) : "—",
+              date: point.occurred_at ? formatDate(point.occurred_at, lang) : "—",
             })}
           </span>
         </div>
@@ -391,7 +386,7 @@ function HistoryRow({ point }: { point: TrendHistoryPoint }) {
 }
 
 function DecisionList({ decisions }: { decisions: TrendDecision[] }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   if (decisions.length === 0)
     return <p className="text-sm text-muted">{t("portfolioDetail.noDecisions")}</p>;
   return (
@@ -400,13 +395,15 @@ function DecisionList({ decisions }: { decisions: TrendDecision[] }) {
         <div key={decision.id} className="border-l-2 border-primary/30 pl-3">
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-semibold uppercase tracking-wide text-primary">
-              {decision.action}
+              {t(`decision.${decision.action}`)}
             </span>
-            <span className="text-[11px] text-faint">{formatDate(decision.created_at)}</span>
+            <span className="text-[11px] text-faint">
+              {formatDate(decision.created_at, lang)}
+            </span>
           </div>
           {decision.reason && <p className="mt-1 text-sm leading-relaxed text-fg">{decision.reason}</p>}
-          <p className="mt-1 flex items-center gap-1 text-xs text-muted">
-            <UserRound className="h-3 w-3" /> {decision.reviewer ?? t("portfolioDetail.system")}
+          <p className="mt-1 text-xs text-muted">
+            {decision.reviewer ?? t("portfolioDetail.system")}
           </p>
         </div>
       ))}
@@ -499,8 +496,9 @@ function DecisionForm({
   );
 }
 
-function formatDate(value: string) {
-  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(
-    new Date(value),
-  );
+function formatDate(value: string, lang: "de" | "en") {
+  return new Intl.DateTimeFormat(lang === "de" ? "de-DE" : "en-GB", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));
 }

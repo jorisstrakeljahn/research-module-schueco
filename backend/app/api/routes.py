@@ -362,6 +362,45 @@ def _snapshot_values(
     }
 
 
+def _localize_values(
+    session: Session,
+    values: dict[str, Any] | None,
+    trend_id: int,
+    language: str | None,
+) -> dict[str, Any] | None:
+    """Swap title/summary in a diff snapshot for their stored translation."""
+    if values is None or not language:
+        return values
+    translation = session.exec(
+        select(TrendTranslation).where(
+            TrendTranslation.trend_id == trend_id,
+            TrendTranslation.language == language,
+        )
+    ).first()
+    if translation is None:
+        return values
+    return {**values, "title": translation.title, "summary": translation.summary}
+
+
+def _localize_reasons(
+    reasons: list[dict[str, Any]],
+    before: dict[str, Any] | None,
+    after: dict[str, Any] | None,
+) -> list[dict[str, Any]]:
+    """Replace stored English title/summary values in review reasons with translations."""
+    localized: list[dict[str, Any]] = []
+    for entry in reasons:
+        field = entry.get("field")
+        if field in ("title", "summary"):
+            entry = dict(entry)
+            if before is not None and entry.get("before") is not None:
+                entry["before"] = before.get(field, entry["before"])
+            if after is not None and entry.get("after") is not None:
+                entry["after"] = after.get(field, entry["after"])
+        localized.append(entry)
+    return localized
+
+
 def _occurrence_snapshot(
     session: Session, occurrence: TrendOccurrence
 ) -> tuple[Trend, Topic, TrendAssessment | None] | None:
@@ -782,7 +821,9 @@ def get_portfolio_trend(
     response_model=PestelAnalysisOut,
 )
 def get_portfolio_trend_pestel_analysis(
-    canonical_id: str, session: Session = Depends(get_session)
+    canonical_id: str,
+    language: str | None = Query(default=None, description="Serve labels in de|en"),
+    session: Session = Depends(get_session),
 ) -> PestelAnalysisOut:
     canonical = session.get(CanonicalTrend, canonical_id)
     if canonical is None:
@@ -799,6 +840,7 @@ def get_portfolio_trend_pestel_analysis(
             session,
             canonical_id=canonical_id,
             occurrence=occurrence,
+            language=language,
         )
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -897,6 +939,14 @@ def get_run_diff(
             ),
         )
         translation = translations.get(occurrence.trend_id)
+        localized_before = (
+            _localize_values(session, before_values, previous.trend_id, language)
+            if previous
+            else before_values
+        )
+        localized_after = _localize_values(
+            session, after_values, occurrence.trend_id, language
+        )
         entries.append(
             RunDiffEntryOut(
                 occurrence_id=occurrence.id,
@@ -908,12 +958,14 @@ def get_run_diff(
                 margin=occurrence.match_margin,
                 changed_fields=changed_fields,
                 review_status=occurrence.review_status,
-                review_reasons=occurrence.review_reasons or [],
+                review_reasons=_localize_reasons(
+                    occurrence.review_reasons or [], localized_before, localized_after
+                ),
                 evidence_added_count=occurrence.evidence_added_count,
                 evidence_removed_count=occurrence.evidence_removed_count,
                 prevalence=occurrence.prevalence,
-                before=before_values,
-                after=after_values,
+                before=localized_before,
+                after=localized_after,
             )
         )
     counted = Counter(entry.change_type for entry in entries)
@@ -973,7 +1025,27 @@ def list_review_queue(
             margin=occurrence.match_margin,
             change_type=occurrence.change_type,
             review_status=occurrence.review_status,
-            review_reasons=occurrence.review_reasons or [],
+            review_reasons=_localize_reasons(
+                occurrence.review_reasons or [],
+                (
+                    dict(
+                        zip(
+                            ("title", "summary"),
+                            _canonical_text(canonical, language)[:2],
+                        )
+                    )
+                    if canonical
+                    else None
+                ),
+                (
+                    {
+                        "title": translations[trend.id].title,
+                        "summary": translations[trend.id].summary,
+                    }
+                    if trend.id in translations
+                    else None
+                ),
+            ),
             changed_fields=occurrence.changed_fields or [],
             evidence_added_count=occurrence.evidence_added_count,
             evidence_removed_count=occurrence.evidence_removed_count,

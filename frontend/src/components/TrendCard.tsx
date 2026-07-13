@@ -33,11 +33,11 @@ export default function TrendCard({ trend }: { trend: Trend }) {
       </div>
       <Link
         href={`/portfolio/${trend.id}`}
-        className="block font-medium leading-snug text-fg hover:text-primary"
+        className="block hyphens-auto font-medium leading-snug wrap-break-word text-fg hover:text-primary"
       >
         {trend.title}
       </Link>
-      <p className="mt-1.5 line-clamp-3 text-sm leading-relaxed text-muted">
+      <p className="mt-1.5 line-clamp-3 hyphens-auto text-sm leading-relaxed wrap-break-word text-muted">
         {trend.summary}
       </p>
     </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Languages } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -90,7 +90,6 @@ export default function TrendDetailPage() {
           disabled={translating}
           className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs font-medium text-muted transition-colors hover:bg-hover hover:text-fg disabled:opacity-60"
         >
-          <Languages className="h-3.5 w-3.5" />
           {translating
             ? t("detail.translating")
             : override
@@ -137,9 +136,9 @@ export default function TrendDetailPage() {
           ))}
         </div>
         <div className="grid max-w-md grid-cols-3 gap-3">
-          <Score label="Impact" value={trend.impact} />
-          <Score label="Urgency" value={trend.urgency} />
-          <Score label="Uncertainty" value={trend.uncertainty} />
+          <Score field="impact" value={trend.impact} />
+          <Score field="urgency" value={trend.urgency} />
+          <Score field="uncertainty" value={trend.uncertainty} />
         </div>
         {rationale && (
           <p className="mt-3 text-[13px] italic leading-relaxed text-muted">
