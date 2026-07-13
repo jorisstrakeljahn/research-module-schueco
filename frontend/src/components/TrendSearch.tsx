@@ -30,8 +30,28 @@ const REGIONS: SearchRegion[] = [
 
 const DEPTHS: ResearchDepth[] = ["quick", "standard", "deep"];
 const FOCUS_SUGGESTIONS = {
-  de: ["EPBD & Regulierung", "Kreislaufwirtschaft", "Digitale Gebäudehülle"],
-  en: ["EPBD & regulation", "Circular economy", "Digital building envelope"],
+  de: [
+    "EPBD & Regulierung",
+    "Kreislaufwirtschaft",
+    "Digitale Gebäudehülle",
+    "Smart Glazing",
+    "BIPV & Solarfassaden",
+    "CO2-armes Aluminium",
+    "Modulares Bauen",
+    "KI im Gebäudebetrieb",
+    "Wärmedämmung",
+  ],
+  en: [
+    "EPBD & regulation",
+    "Circular economy",
+    "Digital building envelope",
+    "Smart glazing",
+    "BIPV & solar facades",
+    "Low-carbon aluminium",
+    "Modular construction",
+    "AI in building operations",
+    "Thermal insulation",
+  ],
 };
 
 export default function TrendSearch({
@@ -202,7 +222,6 @@ export default function TrendSearch({
             </button>
           ))}
           </div>
-          <p className="text-[11px] text-faint">{t(`search.depthHint.${depth}`)}</p>
         </div>
       </div>
 
@@ -223,7 +242,6 @@ export default function TrendSearch({
               disabled={busy}
               className="mt-1.5 h-10 w-full rounded-lg border border-border bg-bg px-3 text-sm text-fg outline-none focus:border-primary"
             />
-            <p className="mt-1 text-[11px] text-faint">{t("search.focusHint")}</p>
             <div className="mt-2 flex flex-wrap gap-1.5">
               {FOCUS_SUGGESTIONS[lang].map((suggestion) => (
                 <button
@@ -269,11 +287,6 @@ export default function TrendSearch({
                 </label>
               ))}
             </div>
-            <p className="mt-1 text-[11px] text-faint">
-              {capabilities?.sources.some((source) => !source.enabled)
-                ? t("search.sourcesUnavailable")
-                : t("search.sourcesHint")}
-            </p>
           </div>
         </div>
         {keywords.length > 0 && (

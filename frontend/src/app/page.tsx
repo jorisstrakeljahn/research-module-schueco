@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -29,7 +28,6 @@ export default function DashboardPage() {
   const { t, lang } = useI18n();
   const [trends, setTrends] = useState<Trend[]>([]);
   const [run, setRun] = useState<Run | null>(null);
-  const [runDiff, setRunDiff] = useState<RunDiff | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeRunId, setActiveRunId] = useState<number | null>(null);
@@ -43,11 +41,7 @@ export default function DashboardPage() {
   const reload = useCallback(() => {
     fetchPortfolioTrends("active", lang).then(setTrends).catch((e) => setError(String(e)));
     fetchRuns()
-      .then((runs) => {
-        const latest = runs[0] ?? null;
-        setRun(latest);
-        if (latest) fetchRunDiff(latest.id, lang).then(setRunDiff).catch(() => setRunDiff(null));
-      })
+      .then((runs) => setRun(runs[0] ?? null))
       .catch(() => setRun(null));
   }, [lang]);
 
@@ -55,9 +49,7 @@ export default function DashboardPage() {
     Promise.all([fetchPortfolioTrends("active", lang), fetchRuns()])
       .then(([trendList, runs]) => {
         setTrends(trendList);
-        const latest = runs[0] ?? null;
-        setRun(latest);
-        if (latest) fetchRunDiff(latest.id, lang).then(setRunDiff).catch(() => setRunDiff(null));
+        setRun(runs[0] ?? null);
       })
       .catch((e) => setError(String(e)))
       .finally(() => setLoading(false));
@@ -201,48 +193,6 @@ export default function DashboardPage() {
         </Panel>
       </div>
 
-      {runDiff && (
-        <Panel title={t("dashboard.panel.lastDiff")}>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-            {(
-              [
-                "new",
-                "classification_changed",
-                "content_changed",
-                "evidence_only",
-                "unchanged",
-              ] as const
-            ).map((kind) => (
-              <Link
-                key={kind}
-                href={`/runs/${runDiff.run_id}`}
-                className="rounded-lg bg-surface-2 p-3 transition-colors hover:bg-hover"
-              >
-                <div className="text-xl font-semibold tabular-nums text-fg">
-                  {runDiff.counts[kind] ?? 0}
-                </div>
-                <div className="mt-1 text-xs text-muted">{t(`diff.${kind}`)}</div>
-              </Link>
-            ))}
-          </div>
-        </Panel>
-      )}
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <QuickLink
-          href="/newsfeed"
-          title={t("nav.newsfeed")}
-          desc={t("dashboard.quick.newsfeedDesc")}
-          open={t("dashboard.open")}
-        />
-        <QuickLink
-          href="/radar"
-          title={t("nav.radar")}
-          desc={t("dashboard.quick.radarDesc")}
-          open={t("dashboard.open")}
-        />
-      </div>
-
             {run && (
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-faint">
                 <span>
@@ -342,25 +292,3 @@ function Bar({
   );
 }
 
-function QuickLink({
-  href,
-  title,
-  desc,
-  open,
-}: {
-  href: string;
-  title: string;
-  desc: string;
-  open: string;
-}) {
-  return (
-    <Link
-      href={href}
-      className="group rounded-xl border border-border bg-surface p-5 shadow-sm transition-colors hover:bg-surface-2"
-    >
-      <h3 className="text-base font-medium text-fg">{title}</h3>
-      <p className="mt-1 text-sm text-muted">{desc}</p>
-      <span className="mt-3 inline-block text-sm text-primary">{open}</span>
-    </Link>
-  );
-}
