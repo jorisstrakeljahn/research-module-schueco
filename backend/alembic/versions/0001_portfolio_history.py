@@ -1,6 +1,6 @@
 """Portfolio history, cumulative corpus and immutable Schüco baseline.
 
-Revision ID: 20260711_01
+Revision ID: 0001
 Revises:
 """
 
@@ -12,7 +12,7 @@ from alembic import op
 from app.baseline import BASELINE_KEY, BASELINE_ROWS, BASELINE_TREND_IDS
 from app.models import SQLModel
 
-revision = "20260711_01"
+revision = "0001"
 down_revision = None
 branch_labels = None
 depends_on = None

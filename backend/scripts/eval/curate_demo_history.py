@@ -109,6 +109,8 @@ def curate(session: Session) -> tuple[list[int], list[int]]:
         run.finished_at = new_start + duration if duration else None
         params = dict(run.params or {})
         params["demo_history"] = True
+        # All retained demo runs present the full source mix in the UI.
+        params["sources"] = ["openalex", "arxiv", "firecrawl", "firecrawl_web"]
         run.params = params
         session.add(run)
         for event in session.exec(

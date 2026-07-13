@@ -1,7 +1,7 @@
 """Bilingual portfolio trends: translations JSONB on canonical_trend.
 
-Revision ID: 20260713_03
-Revises: 20260713_02
+Revision ID: 0005
+Revises: 0004
 """
 
 import sqlalchemy as sa
@@ -10,8 +10,8 @@ from sqlalchemy.dialects.postgresql import JSONB
 
 from alembic import op
 
-revision = "20260713_03"
-down_revision = "20260713_02"
+revision = "0005"
+down_revision = "0004"
 branch_labels = None
 depends_on = None
 

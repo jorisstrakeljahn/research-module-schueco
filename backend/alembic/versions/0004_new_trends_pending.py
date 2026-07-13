@@ -1,15 +1,15 @@
 """New trends always require a human review decision.
 
-Revision ID: 20260713_02
-Revises: 20260713_01
+Revision ID: 0004
+Revises: 0003
 """
 
 from sqlalchemy import text
 
 from alembic import op
 
-revision = "20260713_02"
-down_revision = "20260713_01"
+revision = "0004"
+down_revision = "0003"
 branch_labels = None
 depends_on = None
 
