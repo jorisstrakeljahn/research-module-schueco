@@ -1,6 +1,13 @@
 "use client";
 
-import { ArrowLeft, ExternalLink, GitCommitHorizontal, UserRound } from "lucide-react";
+import {
+  ArrowLeft,
+  ChevronDown,
+  ChevronUp,
+  ExternalLink,
+  GitCommitHorizontal,
+  UserRound,
+} from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -19,6 +26,7 @@ import {
   type PortfolioTrendDetail,
   type Timepoint,
   type TrendDecision,
+  type TrendEvidence,
   type TrendHistory,
   type TrendHistoryPoint,
 } from "@/lib/api";
@@ -112,37 +120,7 @@ export default function PortfolioTrendPage() {
             </Section>
 
             <Section title={t("portfolioDetail.evidence", { n: evidence.length })}>
-              {evidence.length === 0 ? (
-                <p className="text-sm text-muted">{t("portfolioDetail.noEvidence")}</p>
-              ) : (
-                <ol className="divide-y divide-border">
-                  {evidence.map((item, index) => (
-                    <li key={`${item.title}-${index}`} className="flex gap-3 py-3 first:pt-0">
-                      <span className="mt-0.5 text-xs tabular-nums text-faint">{index + 1}</span>
-                      <div className="min-w-0">
-                        {item.url ? (
-                          <a
-                            href={item.url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="flex max-w-full items-start gap-1.5 text-sm text-primary hover:underline"
-                          >
-                            <span className="min-w-0 wrap-break-word">{item.title}</span>
-                            <ExternalLink className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                          </a>
-                        ) : (
-                          <p className="text-sm text-fg">{item.title}</p>
-                        )}
-                        {(item.source || item.published_at) && (
-                          <p className="mt-1 text-xs text-faint">
-                            {[item.source, item.published_at].filter(Boolean).join(" · ")}
-                          </p>
-                        )}
-                      </div>
-                    </li>
-                  ))}
-                </ol>
-              )}
+              <EvidenceList evidence={evidence} />
             </Section>
           </div>
 
@@ -216,6 +194,64 @@ function PestelDimension({ dimension }: { dimension: PestelDimensionAnalysis }) 
         ))}
       </ul>
     </article>
+  );
+}
+
+const EVIDENCE_PREVIEW_COUNT = 6;
+
+function EvidenceList({ evidence }: { evidence: TrendEvidence[] }) {
+  const { t } = useI18n();
+  const [expanded, setExpanded] = useState(false);
+  if (evidence.length === 0)
+    return <p className="text-sm text-muted">{t("portfolioDetail.noEvidence")}</p>;
+  const visible = expanded ? evidence : evidence.slice(0, EVIDENCE_PREVIEW_COUNT);
+  const hidden = evidence.length - EVIDENCE_PREVIEW_COUNT;
+  return (
+    <div>
+      <ol className="divide-y divide-border">
+        {visible.map((item, index) => (
+          <li key={`${item.title}-${index}`} className="flex gap-3 py-3 first:pt-0">
+            <span className="mt-0.5 text-xs tabular-nums text-faint">{index + 1}</span>
+            <div className="min-w-0">
+              {item.url ? (
+                <a
+                  href={item.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex max-w-full items-start gap-1.5 text-sm text-primary hover:underline"
+                >
+                  <span className="min-w-0 wrap-break-word">{item.title}</span>
+                  <ExternalLink className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                </a>
+              ) : (
+                <p className="text-sm text-fg">{item.title}</p>
+              )}
+              {(item.source || item.published_at) && (
+                <p className="mt-1 text-xs text-faint">
+                  {[item.source, item.published_at].filter(Boolean).join(" · ")}
+                </p>
+              )}
+            </div>
+          </li>
+        ))}
+      </ol>
+      {hidden > 0 && (
+        <button
+          onClick={() => setExpanded((value) => !value)}
+          className="mt-3 flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
+        >
+          {expanded ? (
+            <>
+              <ChevronUp className="h-4 w-4" /> {t("portfolioDetail.showLess")}
+            </>
+          ) : (
+            <>
+              <ChevronDown className="h-4 w-4" /> {t("portfolioDetail.showAll", { n: hidden })}
+            </>
+          )}
+        </button>
+      )}
+    </div>
   );
 }
 

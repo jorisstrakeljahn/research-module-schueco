@@ -3,10 +3,8 @@
 import Link from "next/link";
 
 import { CATEGORY_META, RADAR_STAGE_META, type Trend } from "@/lib/api";
-import { useI18n } from "@/lib/i18n";
 
 export default function TrendCard({ trend }: { trend: Trend }) {
-  const { t } = useI18n();
   const cat = trend.category ? CATEGORY_META[trend.category] : null;
   const stage = trend.radar_stage ? RADAR_STAGE_META[trend.radar_stage] : null;
 
@@ -39,22 +37,9 @@ export default function TrendCard({ trend }: { trend: Trend }) {
       >
         {trend.title}
       </Link>
-      <p className="mt-1.5 line-clamp-2 text-sm leading-relaxed text-muted">
+      <p className="mt-1.5 line-clamp-3 text-sm leading-relaxed text-muted">
         {trend.summary}
       </p>
-      <div className="mt-3 flex flex-wrap items-center gap-1.5">
-        {(trend.pestel ?? []).slice(0, 3).map((p) => (
-          <span
-            key={p}
-            className="rounded-full bg-surface-2 px-2 py-0.5 text-[11px] text-muted"
-          >
-            {p}
-          </span>
-        ))}
-        <span className="ml-auto text-[11px] text-faint">
-          {t("card.docs", { n: trend.size })}
-        </span>
-      </div>
     </div>
   );
 }
