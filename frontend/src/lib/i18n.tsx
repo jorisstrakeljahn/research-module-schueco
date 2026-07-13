@@ -262,6 +262,7 @@ const messages: Record<Lang, Dict> = {
     "runs.newTrends": "Neue Trends",
     "runs.newEvidence": "Neue Evidenz",
     "runs.openReviews": "Offene Reviews",
+    "runs.todo": "Review offen",
 
     "diff.new": "Neu",
     "diff.classification_changed": "Neu eingeordnet",
@@ -274,6 +275,8 @@ const messages: Record<Lang, Dict> = {
     "runDetail.back": "Zum Analyseverlauf",
     "runDetail.loading": "Lade Änderungen",
     "runDetail.noChanges": "Keine Einträge in dieser Kategorie.",
+    "runDetail.noMaterialChanges":
+      "In diesem Durchlauf gab es keine fachlichen Änderungen am Trendportfolio.",
     "runDetail.match": "Übereinstimmung",
     "runDetail.evidenceAdded": "Evidenz hinzugefügt",
     "runDetail.evidenceRemoved": "Evidenz entfernt",
@@ -609,6 +612,7 @@ const messages: Record<Lang, Dict> = {
     "runs.newTrends": "New trends",
     "runs.newEvidence": "New evidence",
     "runs.openReviews": "Open reviews",
+    "runs.todo": "Review pending",
 
     "diff.new": "New",
     "diff.classification_changed": "Reclassified",
@@ -621,6 +625,8 @@ const messages: Record<Lang, Dict> = {
     "runDetail.back": "Back to analysis history",
     "runDetail.loading": "Loading changes",
     "runDetail.noChanges": "No entries in this category.",
+    "runDetail.noMaterialChanges":
+      "This run did not produce material changes to the trend portfolio.",
     "runDetail.match": "Match",
     "runDetail.evidenceAdded": "Evidence added",
     "runDetail.evidenceRemoved": "Evidence removed",

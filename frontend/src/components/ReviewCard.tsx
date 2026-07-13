@@ -1,6 +1,5 @@
 "use client";
 
-import { Check, Link2, Merge, Pencil, Plus, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -12,17 +11,17 @@ import {
 import { useI18n } from "@/lib/i18n";
 
 const IDENTITY_ACTIONS = [
-  { value: "link" as const, icon: Link2 },
-  { value: "create" as const, icon: Plus },
-  { value: "merge" as const, icon: Merge },
-  { value: "reject" as const, icon: X },
-];
+  "link",
+  "create",
+  "merge",
+  "reject",
+] as const;
 
 const CLASSIFICATION_ACTIONS = [
-  { value: "confirm" as const, icon: Check },
-  { value: "correct" as const, icon: Pencil },
-  { value: "reject" as const, icon: X },
-];
+  "confirm",
+  "correct",
+  "reject",
+] as const;
 
 export default function ReviewCard({
   item,
@@ -34,7 +33,7 @@ export default function ReviewCard({
   const { t } = useI18n();
   const identityReview = item.review_reasons.some((reason) => reason.kind === "identity");
   const actions = identityReview ? IDENTITY_ACTIONS : CLASSIFICATION_ACTIONS;
-  const [action, setAction] = useState<ReviewDecisionInput["action"]>(actions[0].value);
+  const [action, setAction] = useState<ReviewDecisionInput["action"]>(actions[0]);
   const [target, setTarget] = useState(String(item.suggested_trend?.id ?? ""));
   const [reviewer, setReviewer] = useState("");
   const [reason, setReason] = useState("");
@@ -98,8 +97,7 @@ export default function ReviewCard({
           <h3 className="mt-1.5 text-base font-semibold text-fg">{item.title}</h3>
           <p className="mt-1.5 text-sm leading-relaxed text-muted">{item.summary}</p>
         </div>
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-markets/15 px-2.5 py-1 text-xs font-medium text-markets">
-          <Pencil className="h-3 w-3" />
+        <span className="rounded-full bg-markets/15 px-2.5 py-1 text-xs font-medium text-markets">
           {t("runGroup.review")}
         </span>
       </div>
@@ -145,7 +143,7 @@ export default function ReviewCard({
 
       <div className="mt-5 border-t border-border pt-4">
         <div className="flex flex-wrap gap-1.5">
-          {actions.map(({ value, icon: Icon }) => (
+          {actions.map((value) => (
             <button
               type="button"
               key={value}
@@ -156,7 +154,6 @@ export default function ReviewCard({
                   : "border border-border text-muted hover:bg-hover"
               }`}
             >
-              <Icon className="h-3.5 w-3.5" />
               {t(`review.action.${value}`)}
             </button>
           ))}
