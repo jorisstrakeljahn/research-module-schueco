@@ -59,7 +59,7 @@ _PESTEL_LEXICON: dict[str, set[str]] = {
         "machine", "learning", "iot", "bim", "printing", "additive", "coating",
         "nanotechnology", "photovoltaic", "photovoltaics", "electrochromic",
         "aerogel", "prototype", "patent", "material", "materials", "glazing",
-        "actuator", "automation", "interoperability", "cyber",
+        "actuator", "interoperability", "cyber",
     },
     "environmental": {
         "climate", "carbon", "sustainability", "sustainable", "energy", "emission",
