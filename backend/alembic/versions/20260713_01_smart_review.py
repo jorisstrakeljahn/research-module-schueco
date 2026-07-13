@@ -16,11 +16,13 @@ branch_labels = None
 depends_on = None
 
 
-def _add_column(column: Column) -> None:
+def _add_column(column: Column) -> bool:
     bind = op.get_bind()
     names = {item["name"] for item in inspect(bind).get_columns("trend_occurrence")}
     if column.name not in names:
         op.add_column("trend_occurrence", column)
+        return True
+    return False
 
 
 def upgrade() -> None:
@@ -30,7 +32,7 @@ def upgrade() -> None:
         existing_type=String(),
         nullable=True,
     )
-    _add_column(
+    added_review_status = _add_column(
         Column(
             "review_status",
             String(),
@@ -47,6 +49,11 @@ def upgrade() -> None:
     )
 
     bind = op.get_bind()
+    # Backfill only legacy rows. When the column already existed (e.g. seed-demo
+    # restores a dump in the current format), the data is authoritative and must
+    # not be rewritten.
+    if not added_review_status:
+        return
     bind.execute(
         text(
             """

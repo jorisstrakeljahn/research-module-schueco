@@ -22,6 +22,9 @@ RETAINED_STARTS = {
     8: datetime(2026, 6, 24, 10, 0),
     10: datetime(2026, 7, 3, 10, 0),
     15: datetime(2026, 7, 11, 9, 56, 30, 446847),
+    # Latest run: intentionally keeps pending reviews (new trend, reclassification,
+    # identity check) so the demo can showcase the full review workflow.
+    16: datetime(2026, 7, 13, 9, 17, 26, 952973),
 }
 
 
