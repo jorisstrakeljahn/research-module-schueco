@@ -16,12 +16,18 @@ export interface SearchPreferences {
   topicGranularity: TopicGranularity;
 }
 
-const STORAGE_KEY = "trendscout-search-preferences";
+const STORAGE_KEY = "trendscout-search-preferences-v2";
+export const ALL_SEARCH_SOURCES = [
+  "openalex",
+  "arxiv",
+  "firecrawl",
+  "firecrawl_web",
+] as const;
 
 export const DEFAULT_SEARCH_PREFERENCES: SearchPreferences = {
   region: "global",
-  depth: "standard",
-  sources: [],
+  depth: "deep",
+  sources: [...ALL_SEARCH_SOURCES],
   topicGranularity: "balanced",
 };
 
@@ -32,7 +38,9 @@ export function readSearchPreferences(): SearchPreferences {
     return {
       region: value.region ?? DEFAULT_SEARCH_PREFERENCES.region,
       depth: value.depth ?? DEFAULT_SEARCH_PREFERENCES.depth,
-      sources: Array.isArray(value.sources) ? value.sources : [],
+      sources: Array.isArray(value.sources)
+        ? value.sources
+        : DEFAULT_SEARCH_PREFERENCES.sources,
       topicGranularity:
         value.topicGranularity ?? DEFAULT_SEARCH_PREFERENCES.topicGranularity,
     };

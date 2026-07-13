@@ -46,10 +46,12 @@ export default function SettingsPage() {
         setCapabilities(data);
         const enabled = new Set(data.sources.filter((source) => source.enabled).map((source) => source.id));
         const sources = stored.sources.filter((source) => enabled.has(source));
-        setPreferences({
+        const normalized = {
           ...stored,
           sources: sources.length > 0 ? sources : data.default_sources,
-        });
+        };
+        setPreferences(normalized);
+        writeSearchPreferences(normalized);
       } catch {
         setPreferences(stored);
       }

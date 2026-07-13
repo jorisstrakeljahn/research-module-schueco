@@ -102,7 +102,7 @@ def _run_pipeline_bg(
     mode: str = "deep_research",
     sources: list[str] | None = None,
     region: str = "global",
-    depth: str = "standard",
+    depth: str = "deep",
     holistic_pestel: bool = True,
     topic_granularity: str = "balanced",
 ) -> None:

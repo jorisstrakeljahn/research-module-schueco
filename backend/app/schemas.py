@@ -239,7 +239,7 @@ class RunRequest(BaseModel):
     limit: int | None = Field(default=None, ge=1, le=200)
     language: Literal["en", "de"] = "en"
     mode: Literal["deep_research", "simple"] = "deep_research"
-    depth: Literal["quick", "standard", "deep"] = "standard"
+    depth: Literal["quick", "standard", "deep"] = "deep"
     region: Literal[
         "global", "europe", "dach", "north_america", "asia_pacific", "china"
     ] = "global"

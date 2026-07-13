@@ -11,7 +11,9 @@ import {
 } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import {
+  DEFAULT_SEARCH_PREFERENCES,
   readSearchPreferences,
+  writeSearchPreferences,
   type ResearchDepth,
   type SearchRegion,
   type TopicGranularity,
@@ -49,11 +51,11 @@ export default function TrendSearch({
   const [keywords, setKeywords] = useState<string[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
-  const [depth, setDepth] = useState<ResearchDepth>("standard");
-  const [region, setRegion] = useState<SearchRegion>("global");
+  const [depth, setDepth] = useState<ResearchDepth>(DEFAULT_SEARCH_PREFERENCES.depth);
+  const [region, setRegion] = useState<SearchRegion>(DEFAULT_SEARCH_PREFERENCES.region);
   const [topicGranularity, setTopicGranularity] =
-    useState<TopicGranularity>("balanced");
-  const [sources, setSources] = useState<string[]>([]);
+    useState<TopicGranularity>(DEFAULT_SEARCH_PREFERENCES.topicGranularity);
+  const [sources, setSources] = useState<string[]>(DEFAULT_SEARCH_PREFERENCES.sources);
   const [capabilities, setCapabilities] = useState<SearchCapabilities | null>(null);
 
   useEffect(() => {
@@ -64,7 +66,9 @@ export default function TrendSearch({
         setCapabilities(data);
         const allowed = new Set(data.sources.filter((source) => source.enabled).map((source) => source.id));
         const preferred = preferences.sources.filter((source) => allowed.has(source));
-        setSources(preferred.length > 0 ? preferred : data.default_sources);
+        const selectedSources = preferred.length > 0 ? preferred : data.default_sources;
+        setSources(selectedSources);
+        writeSearchPreferences({ ...preferences, sources: selectedSources });
       } catch {
         setCapabilities(null);
       }
@@ -99,6 +103,7 @@ export default function TrendSearch({
         sources,
         topic_granularity: topicGranularity,
       });
+      writeSearchPreferences({ depth, region, sources, topicGranularity });
       onStarted?.(result);
       setQuery("");
       setKeywords([]);
@@ -242,7 +247,11 @@ export default function TrendSearch({
                 </label>
               ))}
             </div>
-            <p className="mt-1 text-[11px] text-faint">{t("search.sourcesHint")}</p>
+            <p className="mt-1 text-[11px] text-faint">
+              {capabilities?.sources.some((source) => !source.enabled)
+                ? t("search.sourcesUnavailable")
+                : t("search.sourcesHint")}
+            </p>
           </div>
         </div>
         {keywords.length > 0 && (
