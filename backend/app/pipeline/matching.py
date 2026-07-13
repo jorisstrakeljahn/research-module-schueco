@@ -260,7 +260,7 @@ def _review_reason(
     return reason
 
 
-def _proposed_values(
+def proposed_values(
     trend: Trend, assessment: TrendAssessment | None
 ) -> dict[str, object]:
     values: dict[str, object] = {
@@ -337,11 +337,11 @@ def reconcile_run(
         review_reasons: list[dict] = []
         if canonical is None:
             change_type = "new"
-            changed_fields = list(_proposed_values(trend, assessment))
+            changed_fields = list(proposed_values(trend, assessment))
             review_reasons.append(_review_reason("new_trend", kind="classification"))
             previous_documents: frozenset[int] = frozenset()
         else:
-            proposed = _proposed_values(trend, assessment)
+            proposed = proposed_values(trend, assessment)
             changed_fields = [
                 field
                 for field, value in proposed.items()

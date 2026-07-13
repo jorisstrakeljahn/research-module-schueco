@@ -338,6 +338,55 @@ def test_new_trend_is_created_only_after_confirmation(client, session):
 
 
 @requires_db
+def test_new_trend_can_be_linked_to_existing_trend(client, session):
+    _, target, _ = _seed_portfolio(session)
+    run = Run(status="completed", n_documents=1, n_topics=1)
+    session.add(run)
+    session.commit()
+    session.refresh(run)
+    trend = _add_snapshot(
+        session,
+        run=run,
+        index=0,
+        title="Looks new but is not",
+        size=1,
+        maturity="weak_signal",
+        evidence_title="Duplicate evidence",
+    )
+    occurrence = TrendOccurrence(
+        trend_id=trend.id,
+        run_id=run.id,
+        change_type="new",
+        review_status="pending",
+        review_reasons=[{"code": "new_trend", "kind": "classification"}],
+        changed_fields=["title", "summary", "maturity"],
+    )
+    session.add(occurrence)
+    session.commit()
+    session.refresh(occurrence)
+
+    response = client.post(
+        f"/review-queue/{occurrence.id}/decision",
+        json={
+            "action": "link",
+            "reviewer": "reviewer@example.test",
+            "reason": "Duplicate of existing trend",
+            "canonical_trend_id": target.id,
+            "idempotency_key": "new-link-1",
+        },
+    )
+
+    assert response.status_code == 200
+    session.expire_all()
+    resolved = session.get(TrendOccurrence, occurrence.id)
+    assert resolved.review_status == "approved"
+    assert resolved.canonical_trend_id == target.id
+    # Linking must not overwrite the curated content of the target trend.
+    linked = session.get(CanonicalTrend, target.id)
+    assert linked.title == "Target trend"
+
+
+@requires_db
 def test_portfolio_decisions_are_applied_and_idempotent(client, session):
     canonical, target, _ = _seed_portfolio(session)
     correction = {

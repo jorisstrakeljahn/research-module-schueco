@@ -1,27 +1,30 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import {
   decideReviewItem,
+  fetchPortfolioTrends,
+  type PortfolioTrend,
   type ReviewDecisionInput,
   type ReviewQueueItem,
 } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 
-const IDENTITY_ACTIONS = [
-  "link",
-  "create",
-  "merge",
-  "reject",
-] as const;
+type Action = ReviewDecisionInput["action"];
 
-const CLASSIFICATION_ACTIONS = [
-  "confirm",
-  "correct",
-  "reject",
-] as const;
+const DEFAULT_EDITABLE_FIELDS = ["title", "summary"] as const;
+
+let portfolioCache: Promise<PortfolioTrend[]> | null = null;
+
+function loadPortfolio(): Promise<PortfolioTrend[]> {
+  portfolioCache ??= fetchPortfolioTrends("active").catch(() => {
+    portfolioCache = null;
+    return [];
+  });
+  return portfolioCache;
+}
 
 export default function ReviewCard({
   item,
@@ -32,20 +35,53 @@ export default function ReviewCard({
 }) {
   const { t } = useI18n();
   const identityReview = item.review_reasons.some((reason) => reason.kind === "identity");
-  const actions = identityReview ? IDENTITY_ACTIONS : CLASSIFICATION_ACTIONS;
-  const [action, setAction] = useState<ReviewDecisionInput["action"]>(actions[0]);
+  const actions = useMemo<Action[]>(() => {
+    const all: Action[] = ["confirm", "correct", "link", "create", "merge", "reject"];
+    // Without an assigned trend there is nothing to merge; linking covers that case.
+    return item.canonical_trend_id == null
+      ? all.filter((action) => action !== "merge")
+      : all;
+  }, [item.canonical_trend_id]);
+  const [action, setAction] = useState<Action>("confirm");
   const [target, setTarget] = useState(String(item.suggested_trend?.id ?? ""));
+  const [portfolio, setPortfolio] = useState<PortfolioTrend[]>([]);
   const [reviewer, setReviewer] = useState("");
   const [reason, setReason] = useState("");
   const [saving, setSaving] = useState(false);
-  const editableReasons = useMemo(
-    () => item.review_reasons.filter((entry) => entry.field),
-    [item.review_reasons],
-  );
+  const editableFields = useMemo(() => {
+    const fromReasons = item.review_reasons
+      .filter((entry) => entry.field)
+      .map((entry) => ({ field: entry.field!, value: formatValue(entry.after), exemplar: entry.after }));
+    if (fromReasons.length > 0) return fromReasons;
+    return DEFAULT_EDITABLE_FIELDS.map((field) => ({
+      field,
+      value: String(item[field] ?? ""),
+      exemplar: item[field] as unknown,
+    }));
+  }, [item]);
   const [changes, setChanges] = useState<Record<string, string>>(() =>
-    Object.fromEntries(
-      editableReasons.map((entry) => [entry.field!, formatValue(entry.after)]),
-    ),
+    Object.fromEntries(editableFields.map((entry) => [entry.field, entry.value])),
+  );
+
+  const needsTarget = action === "link" || action === "merge";
+  useEffect(() => {
+    if (!needsTarget) return;
+    let active = true;
+    void loadPortfolio().then((trends) => {
+      if (active) setPortfolio(trends);
+    });
+    return () => {
+      active = false;
+    };
+  }, [needsTarget]);
+
+  const targetOptions = useMemo(
+    () =>
+      portfolio.filter(
+        (trend) =>
+          !(action === "merge" && String(trend.id) === String(item.canonical_trend_id)),
+      ),
+    [portfolio, action, item.canonical_trend_id],
   );
 
   async function submit() {
@@ -53,7 +89,7 @@ export default function ReviewCard({
       toast.error(t("review.required"));
       return;
     }
-    if ((action === "link" || action === "merge") && !target.trim()) {
+    if (needsTarget && !target.trim()) {
       toast.error(t("review.targetRequired"));
       return;
     }
@@ -68,9 +104,9 @@ export default function ReviewCard({
         changes:
           action === "correct"
             ? Object.fromEntries(
-                editableReasons.map((entry) => [
-                  entry.field!,
-                  parseValue(changes[entry.field!] ?? "", entry.after),
+                editableFields.map((entry) => [
+                  entry.field,
+                  parseValue(changes[entry.field] ?? "", entry.exemplar),
                 ]),
               )
             : undefined,
@@ -96,6 +132,11 @@ export default function ReviewCard({
           </div>
           <h3 className="mt-1.5 text-base font-semibold text-fg">{item.title}</h3>
           <p className="mt-1.5 text-sm leading-relaxed text-muted">{item.summary}</p>
+          {item.suggested_trend && (
+            <p className="mt-2 text-xs text-muted">
+              {t("review.suggested", { title: item.suggested_trend.title })}
+            </p>
+          )}
         </div>
         <span className="rounded-full bg-markets/15 px-2.5 py-1 text-xs font-medium text-markets">
           {t("runGroup.review")}
@@ -118,29 +159,6 @@ export default function ReviewCard({
         ))}
       </div>
 
-      {item.candidates && item.candidates.length > 0 && (
-        <div className="mt-4 flex flex-wrap gap-2">
-          {item.candidates.map((candidate) => (
-            <button
-              type="button"
-              key={candidate.id}
-              onClick={() => {
-                setAction("link");
-                setTarget(String(candidate.id));
-              }}
-              className={`rounded-lg border px-3 py-2 text-left text-xs ${
-                target === String(candidate.id)
-                  ? "border-primary bg-primary/5 text-primary"
-                  : "border-border text-muted hover:bg-hover"
-              }`}
-            >
-              {candidate.title}
-              {candidate.score != null && ` · ${(candidate.score * 100).toFixed(0)}%`}
-            </button>
-          ))}
-        </div>
-      )}
-
       <div className="mt-5 border-t border-border pt-4">
         <div className="flex flex-wrap gap-1.5">
           {actions.map((value) => (
@@ -158,18 +176,19 @@ export default function ReviewCard({
             </button>
           ))}
         </div>
+        <p className="mt-2 text-xs text-faint">{t(`review.hint.${action}`)}</p>
 
-        {action === "correct" && editableReasons.length > 0 && (
+        {action === "correct" && (
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            {editableReasons.map((entry) => (
+            {editableFields.map((entry) => (
               <label key={entry.field} className="text-xs font-medium text-muted">
                 {t(`field.${entry.field}`)}
                 <input
-                  value={changes[entry.field!] ?? ""}
+                  value={changes[entry.field] ?? ""}
                   onChange={(event) =>
                     setChanges((current) => ({
                       ...current,
-                      [entry.field!]: event.target.value,
+                      [entry.field]: event.target.value,
                     }))
                   }
                   className="mt-1 block h-9 w-full rounded-md border border-border bg-bg px-3 text-sm font-normal text-fg outline-none focus:border-primary"
@@ -179,13 +198,19 @@ export default function ReviewCard({
           </div>
         )}
 
-        {(action === "link" || action === "merge") && (
-          <input
+        {needsTarget && (
+          <select
             value={target}
             onChange={(event) => setTarget(event.target.value)}
-            placeholder={t("review.target")}
-            className="mt-3 h-9 w-full rounded-md border border-border bg-bg px-3 text-sm text-fg outline-none focus:border-primary sm:max-w-sm"
-          />
+            className="mt-3 h-9 w-full rounded-md border border-border bg-bg px-3 text-sm text-fg outline-none focus:border-primary sm:max-w-md"
+          >
+            <option value="">{t("review.targetPlaceholder")}</option>
+            {targetOptions.map((trend) => (
+              <option key={trend.id} value={String(trend.id)}>
+                {trend.title}
+              </option>
+            ))}
+          </select>
         )}
 
         <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-[0.7fr_1.3fr_auto]">

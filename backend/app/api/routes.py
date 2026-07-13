@@ -917,21 +917,16 @@ def decide_review_item(
         "uncertainty": assessment.uncertainty if assessment else None,
         "radar_stage": assessment.radar_stage if assessment else None,
     }
-    reason_kinds = {
-        reason.get("kind")
-        for reason in (occurrence.review_reasons or [])
-        if isinstance(reason, dict)
-    }
-    identity_conflict = "identity" in reason_kinds
-    allowed = (
-        {"link", "create", "merge", "reject"}
-        if identity_conflict
-        else {"confirm", "correct", "reject"}
-    )
+    allowed = {"confirm", "correct", "link", "create", "merge", "reject"}
     if body.action not in allowed:
         raise HTTPException(
             status_code=422,
             detail=f"Action {body.action} is not valid for this review type",
+        )
+    if body.action == "merge" and canonical_id is None:
+        raise HTTPException(
+            status_code=422,
+            detail="This occurrence has no assigned trend to merge; use link instead",
         )
 
     values: dict[str, Any] = {}
@@ -945,9 +940,10 @@ def decide_review_item(
         if session.get(CanonicalTrend, target_id) is None:
             raise HTTPException(status_code=422, detail="Target trend does not exist")
         if body.action == "link":
+            # Linking assigns the occurrence to the curated trend without
+            # overwriting the trend's reviewed content.
             occurrence.canonical_trend_id = target_id
             canonical_id = target_id
-            values = proposed
         else:
             values["merged_into_id"] = target_id
     elif body.action == "create":
