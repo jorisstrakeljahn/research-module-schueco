@@ -29,29 +29,52 @@ from app.pipeline.timeseries import growth_ratio
 # domain-tuned; the LLM classifier is the scientific default for nuance.
 _PESTEL_LEXICON: dict[str, set[str]] = {
     "political": {
-        "policy", "government", "subsidy", "tariff", "geopolitical", "public",
-        "funding", "incentive", "sovereignty", "trade",
+        "policy", "policies", "government", "governmental", "subsidy", "subsidies",
+        "tariff", "tariffs", "geopolitical", "geopolitics", "public", "funding",
+        "incentive", "incentives", "sovereignty", "trade", "ministry", "municipal",
+        "election", "sanction", "sanctions", "diplomacy", "federal", "parliament",
+        "programme", "program", "initiative", "governance",
     },
     "economic": {
-        "market", "cost", "investment", "price", "demand", "supply", "economic",
-        "business", "growth", "servitization", "productivity", "competition",
+        "market", "markets", "cost", "costs", "investment", "investments", "price",
+        "prices", "pricing", "demand", "supply", "economic", "economy", "business",
+        "growth", "servitization", "productivity", "competition", "competitor",
+        "financing", "finance", "capital", "revenue", "profitability", "inflation",
+        "procurement", "export", "import", "industry", "manufacturer", "startup",
+        "venture", "adoption", "commercialization", "commercialisation", "leasing",
     },
     "social": {
-        "social", "society", "demographic", "skills", "workforce", "user", "health",
-        "wellbeing", "community", "labour", "talent", "people", "silver",
+        "social", "society", "societal", "demographic", "demographics", "skills",
+        "workforce", "user", "users", "health", "wellbeing", "well-being",
+        "community", "labour", "labor", "talent", "people", "silver", "aging",
+        "ageing", "occupant", "occupants", "tenant", "tenants", "resident",
+        "residents", "comfort", "affordable", "affordability", "housing",
+        "urbanization", "urbanisation", "migration", "lifestyle", "acceptance",
+        "education", "craftsman", "shortage", "safety", "accessibility",
     },
     "technological": {
-        "technology", "digital", "sensor", "automation", "software", "innovation",
-        "smart", "platform", "robotic", "data", "twin", "modular", "prefabrication",
+        "technology", "technologies", "digital", "sensor", "sensors", "automation",
+        "software", "innovation", "smart", "platform", "robotic", "robotics",
+        "data", "twin", "modular", "prefabrication", "ai", "algorithm",
+        "machine", "learning", "iot", "bim", "printing", "additive", "coating",
+        "nanotechnology", "photovoltaic", "photovoltaics", "electrochromic",
+        "aerogel", "prototype", "patent", "material", "materials", "glazing",
+        "actuator", "automation", "interoperability", "cyber",
     },
     "environmental": {
-        "climate", "carbon", "sustainability", "energy", "emission", "circular",
-        "green", "environmental", "decarbonization", "decarbonisation", "resilience",
-        "renewable", "recycling", "embodied",
+        "climate", "carbon", "sustainability", "sustainable", "energy", "emission",
+        "emissions", "circular", "circularity", "green", "environmental",
+        "decarbonization", "decarbonisation", "resilience", "renewable",
+        "renewables", "recycling", "recycled", "embodied", "biodiversity",
+        "pollution", "waste", "warming", "adaptation", "mitigation", "heatwave",
+        "cradle", "lifecycle", "life-cycle", "ecological", "solar", "geothermal",
     },
     "legal": {
-        "legal", "law", "compliance", "standard", "directive", "epbd", "certification",
-        "regulation", "regulatory", "norm", "mandate",
+        "legal", "law", "laws", "compliance", "standard", "standards", "directive",
+        "directives", "epbd", "certification", "certified", "regulation",
+        "regulations", "regulatory", "norm", "norms", "mandate", "mandatory",
+        "liability", "warranty", "code", "codes", "taxonomy", "disclosure",
+        "audit", "gdpr", "din", "iso", "ce", "permit", "permits", "zoning",
     },
 }
 
@@ -96,6 +119,7 @@ class TrendSignal:
     n_sources: int = 1
     timepoints: dict[str, int] = field(default_factory=dict)
     evidence: list[dict] = field(default_factory=list)
+    language: str = "en"  # language for the human-readable rationale
 
 
 @dataclass
@@ -231,22 +255,56 @@ class OpenAIClassifier:
 
     def classify(self, signal: TrendSignal) -> Classification:
         context = "\n".join(
-            f"- {e.get('title', '')}" for e in signal.evidence[:6] if e.get("title")
+            f"- {e.get('title', '')}" for e in signal.evidence[:8] if e.get("title")
+        )
+        rationale_lang = {"de": "German", "en": "English"}.get(
+            signal.language, "English"
         )
         prompt = (
-            "You are a corporate-foresight analyst at a building-envelope company. "
-            "Classify the trend below using ONLY the evidence and keywords given.\n"
-            f"Title: {signal.title}\nKeywords: {', '.join(signal.keywords)}\n"
-            f"Summary: {signal.summary}\nEvidence:\n{context}\n\n"
-            "Evaluate every PESTEL dimension independently against the evidence. "
-            "Do not default to technological or environmental merely because this is "
-            "a building-industry trend, and do not enforce an artificial quota. "
-            f"Return the one to three dimensions with direct support from: "
-            f"{', '.join(PESTEL_DIMENSIONS)}.\n"
-            f"Category must be exactly one of: {', '.join(TREND_CATEGORIES)}.\n"
-            "Score impact (strategic effect on the building industry) and urgency "
-            "(how soon action is needed) and uncertainty (how unpredictable), each an "
-            "integer 1-10. Give a one-sentence rationale.\n"
+            "You are a senior corporate-foresight analyst at Schüco, a manufacturer "
+            "of window, door and facade systems. Classify the trend below for the "
+            "company trend radar, using ONLY the evidence given.\n\n"
+            f"Title: {signal.title}\n"
+            f"Keywords: {', '.join(signal.keywords)}\n"
+            f"Summary: {signal.summary}\n"
+            f"Evidence (document titles):\n{context}\n\n"
+            "Step 1 - PESTEL: decide which perspective DRIVES this trend, i.e. what "
+            "kind of force is causing the change:\n"
+            "- political: government programs, subsidies, geopolitics, public funding\n"
+            "- economic: markets, costs, investment, demand, business models, supply chains\n"
+            "- social: demographics, workforce and skills, health, user behaviour, housing needs\n"
+            "- technological: new technical capabilities, materials, digitalization, automation\n"
+            "- environmental: climate change, emissions, energy transition, circularity\n"
+            "- legal: laws, directives (e.g. EPBD), standards, certification, compliance\n"
+            "Ordering rules - almost every building-sector trend LOOKS technological "
+            "because the artifact is technical, so rank by the force that would make "
+            "the trend stall if it disappeared:\n"
+            "- If the evidence cites a directive, standard or certification scheme "
+            "as the reason for adoption, rank legal (or political for funding "
+            "programs) BEFORE technological.\n"
+            "- If the evidence is about costs, market growth, business models or "
+            "supply chains, rank economic first.\n"
+            "- If it addresses occupant comfort, health, housing shortage or skilled "
+            "labour, rank social first.\n"
+            "- Rank technological first ONLY when a genuinely new technical "
+            "capability itself is the news (new material, new process, new device).\n"
+            "- Energy efficiency alone is not 'environmental'; use environmental "
+            "first when climate change, emissions targets or circularity drive it.\n"
+            "Pick 1-3 dimensions, strongest driver FIRST, only dimensions with "
+            "direct evidence support.\n\n"
+            f"Step 2 - Category (radar colour), exactly one of: "
+            f"{', '.join(TREND_CATEGORIES)}.\n\n"
+            "Step 3 - Scores, each an integer 1-10, and use the full scale:\n"
+            "- impact: strategic effect on a facade/window manufacturer (1 = fringe "
+            "curiosity, 5 = affects single product lines, 10 = redefines the core "
+            "business)\n"
+            "- urgency: how soon action is needed (1 = >10 years out, 5 = within "
+            "3-5 years, 10 = already binding or being adopted by competitors)\n"
+            "- uncertainty: how unpredictable direction and timing are (1 = locked "
+            "in, e.g. adopted regulation, 10 = speculative early research)\n\n"
+            f"Step 4 - rationale: 1-2 sentences in {rationale_lang}, naming the "
+            "driving force and the concrete evidence behind your PESTEL and score "
+            "choices, so a reviewer can verify the classification.\n\n"
             'Respond as JSON: {"pestel": ["..."], "category": "...", "impact": 0, '
             '"urgency": 0, "uncertainty": 0, "rationale": "..."}'
         )

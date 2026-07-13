@@ -71,16 +71,28 @@ class OpenAIDescriber:
         self, keywords: list[str], representative: list[dict], language: str = "en"
     ) -> TrendDescription:
         context = "\n".join(
-            f"- {r.get('title', '')}: {r.get('text', '')[:400]}"
-            for r in representative[:6]
+            f"- {r.get('title', '')}: {r.get('text', '')[:350]}"
+            for r in representative[:8]
         )
         lang_name = _LANGUAGE_NAMES.get(language, "English")
         prompt = (
-            "You are a foresight analyst. Based ONLY on the sources below, write a "
-            "concise trend title (max 8 words) and a 2-3 sentence summary. "
-            f"Write the title and summary in {lang_name}. "
-            "Do not invent facts beyond the sources.\n"
-            f"Keywords: {', '.join(keywords)}\nSources:\n{context}\n\n"
+            "You are a senior corporate-foresight analyst at Schüco, a manufacturer "
+            "of window, door and facade systems (building envelope). A topic cluster "
+            "from a literature and news scan is described below by its keywords and "
+            "representative sources.\n\n"
+            f"Keywords: {', '.join(keywords)}\n"
+            f"Sources:\n{context}\n\n"
+            "Write, based ONLY on these sources (do not invent facts):\n"
+            f"1. \"title\" ({lang_name}, 4-8 words): name the ONE concrete "
+            "technology, market development or regulatory change that unites the "
+            "sources - the way a trend-radar entry would be labelled (e.g. "
+            "'Building-Integrated Photovoltaics Reach Facade Scale'). Never use a "
+            "bare keyword list, and avoid empty words like 'trends', 'insights', "
+            "'research' or 'developments' on their own.\n"
+            f"2. \"summary\" ({lang_name}, 2-4 sentences): first state WHAT is "
+            "emerging or changing, then WHICH evidence from the sources supports it "
+            "(name concrete technologies, numbers or regulations if present), and "
+            "finally WHY it matters for the building-envelope industry.\n\n"
             'Respond as JSON: {"title": "...", "summary": "..."}'
         )
         try:

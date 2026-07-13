@@ -486,6 +486,7 @@ def run_pipeline(
                     n_sources=max(1, n_sources),
                     timepoints=tp,
                     evidence=description.evidence,
+                    language=language or "en",
                 )
             )
             session.add(
