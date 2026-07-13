@@ -257,6 +257,36 @@ def test_portfolio_read_contracts(client, session):
 
 
 @requires_db
+def test_portfolio_order_persists_and_sorts_listing(client, session):
+    canonical, target, _ = _seed_portfolio(session)
+
+    response = client.post(
+        "/portfolio/order",
+        json={
+            "items": [
+                {"id": target.id, "position": 0},
+                {"id": canonical.id, "position": 1},
+            ]
+        },
+    )
+    assert response.status_code == 200
+    assert response.json() == {"updated": 2}
+
+    listing = client.get("/portfolio/trends").json()
+    item = next(entry for entry in listing if entry["id"] == canonical.id)
+    assert item["position"] == 1
+
+    session.expire_all()
+    assert session.get(CanonicalTrend, target.id).position == 0
+
+    missing = client.post(
+        "/portfolio/order",
+        json={"items": [{"id": "does-not-exist", "position": 0}]},
+    )
+    assert missing.status_code == 404
+
+
+@requires_db
 def test_portfolio_serves_requested_language(client, session):
     canonical, _, _ = _seed_portfolio(session)
     canonical.translations = {

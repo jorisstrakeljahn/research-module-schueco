@@ -39,6 +39,7 @@ from app.schemas import (
     OverlapMatch,
     PestelAnalysisOut,
     PortfolioDecisionIn,
+    PortfolioOrderIn,
     PortfolioTrendDetailOut,
     PortfolioTrendOut,
     ReferenceSummary,
@@ -434,6 +435,7 @@ def _portfolio_out(
         merged_into_id=canonical.merged_into_id,
         occurrence_count=occurrence_count,
         updated_at=canonical.updated_at,
+        position=canonical.position,
     )
 
 
@@ -709,7 +711,11 @@ def list_portfolio_trends(
     language: str | None = Query(default=None, description="Serve trend text in de|en"),
     session: Session = Depends(get_session),
 ) -> list[PortfolioTrendOut]:
-    query = select(CanonicalTrend).order_by(CanonicalTrend.updated_at.desc())
+    # Manually sorted trends first (drag & drop order), the rest by recency.
+    query = select(CanonicalTrend).order_by(
+        CanonicalTrend.position.asc().nulls_last(),
+        CanonicalTrend.updated_at.desc(),
+    )
     if status:
         query = query.where(CanonicalTrend.status == status)
     canonicals = list(session.exec(query).all())
@@ -725,6 +731,30 @@ def list_portfolio_trends(
                 )
             )
     return result
+
+
+@router.post("/portfolio/order", dependencies=[Depends(require_token)])
+def update_portfolio_order(
+    body: PortfolioOrderIn,
+    session: Session = Depends(get_session),
+) -> dict:
+    """Persist the manual newsfeed sort order (drag & drop within a column).
+
+    Pure presentation state - deliberately not part of the review/decision
+    audit trail.
+    """
+    trends: list[CanonicalTrend] = []
+    for item in body.items:
+        canonical = session.get(CanonicalTrend, item.id)
+        if canonical is None:
+            raise HTTPException(
+                status_code=404, detail=f"Portfolio trend {item.id} not found"
+            )
+        canonical.position = item.position
+        trends.append(canonical)
+    session.add_all(trends)
+    session.commit()
+    return {"updated": len(trends)}
 
 
 @router.get(

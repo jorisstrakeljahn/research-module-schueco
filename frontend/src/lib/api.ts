@@ -55,6 +55,8 @@ export interface PortfolioTrend extends Trend {
   merged_into_id: string | number | null;
   occurrence_count?: number;
   updated_at?: string | null;
+  /** Manual drag & drop sort position within the newsfeed column. */
+  position?: number | null;
 }
 
 export interface TrendEvidence {
@@ -417,6 +419,12 @@ export function decidePortfolioTrend(
     ...body,
     idempotency_key: body.idempotency_key ?? crypto.randomUUID(),
   });
+}
+
+export function updatePortfolioOrder(
+  items: { id: string | number; position: number }[],
+): Promise<{ updated: number }> {
+  return mutate("/portfolio/order", { items });
 }
 
 export function decideReviewItem(

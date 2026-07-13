@@ -95,6 +95,17 @@ class PortfolioTrendOut(TrendOut):
     merged_into_id: str | None = None
     occurrence_count: int = 0
     updated_at: datetime | None = None
+    # Manual drag & drop sort position within the newsfeed maturity column.
+    position: float | None = None
+
+
+class PortfolioOrderItemIn(BaseModel):
+    id: str
+    position: float
+
+
+class PortfolioOrderIn(BaseModel):
+    items: list[PortfolioOrderItemIn] = Field(min_length=1, max_length=200)
 
 
 class TrendEvidenceOut(BaseModel):

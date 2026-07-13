@@ -340,6 +340,8 @@ class CanonicalTrend(SQLModel, table=True):
     # ``title``/``summary`` above stay the curation default; the API serves the
     # requested language from here so DE and EN views are both first-class.
     translations: dict | None = Field(default=None, sa_column=Column(JSONB))
+    # Manual sort position inside the newsfeed maturity column (drag & drop).
+    position: float | None = Field(default=None)
     first_run_id: int | None = Field(default=None, foreign_key="run.id", index=True)
     last_run_id: int | None = Field(default=None, foreign_key="run.id", index=True)
     merged_into_id: str | None = Field(default=None, foreign_key="canonical_trend.id")
